@@ -17,22 +17,50 @@
       href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;500&family=Manrope:wght@300;400;500;600&display=swap"
     />
     <link rel="stylesheet" href="css/admin.css" />
-    <script src="js/api.js" defer></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.4"
+      integrity="sha384-yiVMs0R/Jyz7OhoXa/DsEMUSBLjEhr/QJta2ONO+zB6I8/GmNg/7AUFrZmAJV7KV"
+      crossorigin="anonymous"
+      defer
+    ></script>
+    <script src="../js/supabase-client.js" defer></script>
+    <script src="../js/auth.js" defer></script>
     <script src="js/admin.js" defer></script>
+    <script src="js/admin-guard.js" defer></script>
   </head>
-  <body>
-    <a class="skip-link" href="#workspace">Skip to workspace</a>
+  <body class="admin-page">
+    <main id="auth-check" class="auth-gate" aria-labelledby="auth-check-heading">
+      <section class="auth-card">
+        <img src="../assets/images/pace-bros-logo.png" alt="" width="52" height="52" />
+        <p class="eyebrow">Private administration</p>
+        <h1 id="auth-check-heading">Checking access</h1>
+        <p id="auth-check-message" role="status" aria-live="polite">
+          Verifying your Pace Bros administrator session.
+        </p>
+        <div class="auth-progress" aria-hidden="true"><span></span></div>
+        <div class="auth-actions">
+          <button id="retry-auth" class="button button-secondary" type="button" hidden>Retry</button>
+          <a class="back-link" href="../">Return to public site</a>
+        </div>
+      </section>
+    </main>
 
-    <header class="topbar">
-      <a class="brand" href="../index.html" aria-label="Open the Pace Bros Visuals public site">
+    <div id="admin-app" hidden inert>
+      <a class="skip-link" href="#workspace">Skip to workspace</a>
+
+      <header class="topbar">
+        <a class="brand" href="../" aria-label="Open the Pace Bros Visuals public site">
         <img src="../assets/images/pace-bros-logo.png" alt="" width="40" height="40" />
         <span>Pace Bros Visuals</span>
-      </a>
-      <div id="connection-status" class="connection-status is-checking" role="status" aria-live="polite">
-        <span class="status-dot" aria-hidden="true"></span>
-        <span id="connection-label">Checking secure backend</span>
-      </div>
-    </header>
+        </a>
+        <div class="topbar-actions">
+          <div id="connection-status" class="connection-status is-connected" role="status" aria-live="polite">
+            <span class="status-dot" aria-hidden="true"></span>
+            <span id="connection-label">Authorized administrator</span>
+          </div>
+          <button id="logout-button" class="logout-button" type="button">Logout</button>
+        </div>
+      </header>
 
     <div class="admin-shell">
       <aside class="sidebar" aria-labelledby="workspace-name">
@@ -51,7 +79,7 @@
         <section class="access-note" aria-labelledby="access-heading">
           <h2 id="access-heading">Access boundary</h2>
           <p id="access-copy">
-            Write controls stay locked until the future backend confirms an authorized Adam or Craig session.
+            Supabase verified this session and its matching administrator authorization row.
           </p>
         </section>
       </aside>
@@ -63,8 +91,8 @@
             <h2>Prepare the next release</h2>
           </div>
           <p>
-            This is an isolated planning shell. Reviewing a draft works locally; nothing is uploaded,
-            saved, sent to AI, or published without a secured backend.
+            This authenticated Phase 1 shell remains a planning workspace. Nothing is uploaded,
+            saved, sent to AI, or published yet.
           </p>
         </header>
 
@@ -200,7 +228,8 @@
             </div>
           </aside>
         </div>
-      </main>
+        </main>
+      </div>
     </div>
   </body>
 </html>

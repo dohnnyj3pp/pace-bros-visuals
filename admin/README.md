@@ -1,48 +1,44 @@
-# Pace Bros Visuals admin foundation
+# Pace Bros Visuals admin — Phase 1 authentication
 
-This directory is intentionally isolated from the public landing page. The first increment is a static, unlinked admin shell that can review a draft locally. It does not save data, upload files, call an AI service, or publish content.
+The existing admin workspace remains a static, unlinked planning shell. Phase 1 adds Supabase email/password authentication and an `admin_users` authorization check before the workspace is revealed or initialized.
 
-## Security boundary
+Uploads, storage, AI assistance, social integrations, scheduling, publishing, and analytics are intentionally not connected.
 
-Hiding `/admin/` is not authentication. Every future write endpoint must authenticate the current user and authorize Adam or Craig on the server. Do not add client-side passwords, API keys, AI credentials, storage credentials, or an editor allowlist to these files.
+## Browser-safe configuration
 
-Keep the public landing page available to everyone. Keep admin routes, draft records, upload requests, AI jobs, and publish actions private.
+The shared client uses only:
 
-## Target flow
+- the Pace Bros Visuals Supabase project URL;
+- the browser-safe `sb_publishable_...` API key;
+- Supabase JS v2, exact-pinned to `2.112.4` with Subresource Integrity.
 
-1. The server confirms an authorized editor session.
-2. The editor saves a private film draft.
-3. The server issues short-lived signed upload instructions.
-4. The browser uploads the asset directly to object storage.
-5. The server validates the asset and records its metadata.
-6. Requested AI jobs create suggestions attached to the draft.
-7. Adam or Craig reviews those suggestions and explicitly publishes a version.
-8. The public site reads only published film records.
+The publishable key is expected to be visible in this static site. Security comes from Supabase Auth, the matching UUID authorization row, database grants, and Row Level Security. Never add a secret key, `service_role` key, database password, user password, or private backend credential to this repository.
 
-AI output must remain a suggestion. It must never publish automatically.
+## Authentication and authorization flow
 
-## API boundary prepared by `js/api.js`
+1. `admin/login.html` calls `supabase.auth.signInWithPassword()` with the submitted email and password.
+2. The authenticated user's UUID is read from the validated Supabase user.
+3. The browser queries `public.admin_users` for that exact `user_id` and selects only `user_id` and `display_name`.
+4. Row Level Security must allow an authenticated user to read only their own authorization row.
+5. A matching row allows navigation to `/admin/`.
+6. The admin page repeats the session and authorization check on every load before revealing or initializing the existing workspace.
+7. A missing authorization row signs the user out locally and denies access.
+8. A network or authorization-query error keeps the workspace hidden and offers a retry.
 
-- `GET /api/admin/session`
-- `GET /api/admin/films`
-- `POST /api/admin/films`
-- `POST /api/admin/uploads`
-- `POST /api/admin/films/:filmId/automations`
-- `POST /api/admin/films/:filmId/publish`
+There is no Sign Up or self-promotion flow. The browser never inserts, updates, deletes, or upserts `admin_users` records.
 
-The client always sends same-origin credentials. The server must enforce authorization, validate every field and file, rate-limit sensitive actions, and return safe JSON errors.
+## GitHub Pages paths
 
-## Minimum server-side records
+All site links and redirects are document-relative so the repository prefix is preserved:
 
-- `Film`: title, slug, logline, year, runtime, format, status, sort order, version, timestamps.
-- `Asset`: film owner, storage key, original name, verified MIME type, byte size, kind, processing status, timestamps.
-- `AutomationJob`: film owner, requested task, status, model/prompt version, output, cost metadata, timestamps.
-- `AuditEvent`: actor, action, record, prior version, resulting version, timestamp.
+- public site: `https://dohnnyj3pp.github.io/pace-bros-visuals/`
+- login: `https://dohnnyj3pp.github.io/pace-bros-visuals/admin/login.html`
+- protected admin: `https://dohnnyj3pp.github.io/pace-bros-visuals/admin/`
 
-Store structured metadata in a database and video/image bytes in object storage. Never put uploaded media in Git or store authoritative draft data in `localStorage`.
+The older `js/api.js` file is deliberately not loaded in Phase 1. Its root-relative `/api/admin` placeholder is not compatible with GitHub Pages and belongs to a future backend phase.
 
-## Next increment
+## Static-host security boundary
 
-Choose the production host, then implement only `GET /api/admin/session` and server-side authorization first. After that, connect private film drafts and audit logging before adding signed uploads or AI jobs.
+The HTML, CSS, JavaScript, and publishable key are public. Hiding the admin shell prevents a UI flash and blocks local initialization before authorization, but it is not the data-security boundary. Every future database or storage operation must have its own least-privilege RLS policy.
 
-The landing page should keep its current hard-coded film array as a fallback until the published-content feed is proven stable. Before accepting admin-authored copy in the public renderer, replace template-string `innerHTML` insertion with validated DOM creation and `textContent`.
+Supabase sessions persist in browser storage so refreshes can restore a valid session. Because GitHub Pages projects under the same `dohnnyj3pp.github.io` host share an origin, a dedicated custom domain would provide stronger session isolation in a future infrastructure phase.

@@ -1,5 +1,11 @@
-(function initializeAdmin() {
+(function exposeAdminWorkspace(global) {
   "use strict";
+
+  let initialized = false;
+
+  function initialize({ user, adminProfile } = {}) {
+    if (initialized) return;
+    initialized = true;
 
   const form = document.querySelector("#film-form");
   const titleInput = document.querySelector("#title");
@@ -55,34 +61,12 @@
     accessCopy.textContent = detail;
   }
 
-  async function checkSession() {
-    try {
-      const session = await window.PaceAdminApi.getSession();
-      const isAuthorized = Boolean(session && session.authenticated && session.authorized);
-
-      if (!isAuthorized) {
-        setConnectionState(
-          "is-locked",
-          "Sign-in required",
-          "The backend responded, but this browser does not have an authorized Adam or Craig session.",
-        );
-        return;
-      }
-
-      const displayName = session.user?.name || session.user?.email || "Authorized editor";
-      setConnectionState(
-        "is-connected",
-        displayName,
-        "The backend confirmed an authorized session. Draft actions can be connected in the next increment.",
-      );
-    } catch {
-      setConnectionState(
-        "is-locked",
-        "Backend not connected",
-        "Write controls are intentionally locked. A future server must authenticate and authorize Adam or Craig before enabling them.",
-      );
-    }
-  }
+  const displayName = adminProfile?.display_name || "Authorized administrator";
+  setConnectionState(
+    "is-connected",
+    displayName,
+    `Supabase verified the administrator session for ${user?.email || "this account"}. Phase 2 controls remain disabled.`,
+  );
 
   function reviewDraft(event) {
     event.preventDefault();
@@ -130,5 +114,7 @@
   });
 
   form.addEventListener("submit", reviewDraft);
-  checkSession();
-})();
+  }
+
+  global.PaceAdmin = Object.freeze({ initialize });
+})(window);

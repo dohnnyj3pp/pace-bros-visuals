@@ -18,6 +18,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 html {
   background: var(--void);
   color-scheme: dark;
@@ -32,6 +36,11 @@ body {
   font-size: 0.9375rem;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+}
+
+body.login-page,
+body.admin-page {
+  min-height: 100vh;
 }
 
 button,
@@ -93,6 +102,12 @@ a {
   backdrop-filter: blur(18px);
 }
 
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
 .brand {
   display: inline-flex;
   align-items: center;
@@ -136,6 +151,162 @@ a {
 .connection-status.is-locked .status-dot {
   background: var(--ember);
   box-shadow: 0 0 0 0.22rem color-mix(in srgb, var(--ember) 16%, transparent);
+}
+
+.logout-button {
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 0.3rem;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.logout-button:hover,
+.logout-button:focus-visible {
+  color: var(--foreground);
+}
+
+.logout-button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.auth-gate,
+.login-shell {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 1.25rem;
+  background:
+    radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--ember-soft) 16%, transparent), transparent 34rem),
+    var(--void);
+}
+
+.auth-card,
+.login-panel {
+  width: min(100%, 30rem);
+  padding: clamp(1.5rem, 5vw, 3rem);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--panel) 95%, transparent);
+  box-shadow: 0 2rem 7rem color-mix(in srgb, #000 58%, transparent);
+}
+
+.auth-card {
+  text-align: center;
+}
+
+.auth-card > img {
+  width: 3.25rem;
+  height: 3.25rem;
+  margin-bottom: 1.25rem;
+  object-fit: contain;
+  opacity: 0.85;
+  mix-blend-mode: screen;
+}
+
+.auth-card h1,
+.login-heading h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(2.2rem, 9vw, 3.6rem);
+  font-weight: 300;
+  line-height: 1;
+  letter-spacing: 0.02em;
+}
+
+.auth-card > p:not(.eyebrow),
+.login-heading > p:not(.eyebrow) {
+  margin: 1rem 0 0;
+  color: var(--muted);
+}
+
+.auth-progress {
+  width: 100%;
+  height: 1px;
+  margin-top: 1.75rem;
+  overflow: hidden;
+  background: var(--border);
+}
+
+.auth-progress span {
+  display: block;
+  width: 40%;
+  height: 100%;
+  background: var(--ember);
+  animation: auth-progress 1.35s ease-in-out infinite;
+}
+
+.auth-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.login-panel {
+  width: min(100%, 34rem);
+}
+
+.login-brand {
+  width: fit-content;
+}
+
+.login-brand img {
+  width: 3rem;
+  height: 3rem;
+}
+
+.login-heading {
+  margin-top: 3.5rem;
+}
+
+.login-form {
+  display: grid;
+  gap: 1.25rem;
+  margin-top: 2.25rem;
+}
+
+.login-message {
+  min-height: 1.5rem;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.login-message.is-error {
+  color: #d7837c;
+}
+
+.login-message.is-success {
+  color: var(--success);
+}
+
+.login-button {
+  width: 100%;
+}
+
+.back-link {
+  display: inline-block;
+  margin-top: 1.5rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-underline-offset: 0.25rem;
+}
+
+.back-link:hover,
+.back-link:focus-visible {
+  color: var(--foreground);
+}
+
+@keyframes auth-progress {
+  from { transform: translateX(-110%); }
+  to { transform: translateX(360%); }
 }
 
 .admin-shell {
@@ -539,6 +710,27 @@ input[type="file"]::file-selector-button {
   }
 }
 
+@media (max-width: 560px) {
+  .topbar-actions {
+    gap: 0.6rem;
+  }
+
+  .connection-status {
+    max-width: 9rem;
+  }
+
+  .connection-status span:last-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .logout-button {
+    padding-right: 0.5rem;
+    padding-left: 0.5rem;
+  }
+}
+
 @media (min-width: 900px) {
   .admin-shell {
     grid-template-columns: 17rem minmax(0, 1fr);
@@ -590,5 +782,10 @@ input[type="file"]::file-selector-button {
   *::after {
     scroll-behavior: auto !important;
     transition-duration: 0.001ms !important;
+  }
+
+  .auth-progress span {
+    animation: none;
+    transform: none;
   }
 }

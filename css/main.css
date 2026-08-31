@@ -297,6 +297,13 @@ body.entered main { opacity: 1; }
   .film-copy > p { color: color-mix(in oklab, var(--foreground) 85%, transparent); }
 }
 
+@media (max-width: 520px) {
+  .nav-inner { padding: 1.25rem .75rem; }
+  .brand-link img { width: 2rem; height: 2rem; }
+  .site-nav ul { gap: .65rem; }
+  .site-nav a:not(.brand-link) { font-size: .55rem; letter-spacing: .22em; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
 }

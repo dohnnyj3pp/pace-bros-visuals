@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow, noarchive" />
+    <meta name="description" content="Private administrator login for Pace Bros Visuals." />
+    <title>Pace Bros Visuals — Administrator Login</title>
+    <link rel="icon" href="../assets/images/favicon.ico" sizes="any" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;500&family=Manrope:wght@300;400;500;600&display=swap"
+    />
+    <link rel="stylesheet" href="css/admin.css" />
+    <script
+      src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.4"
+      integrity="sha384-yiVMs0R/Jyz7OhoXa/DsEMUSBLjEhr/QJta2ONO+zB6I8/GmNg/7AUFrZmAJV7KV"
+      crossorigin="anonymous"
+      defer
+    ></script>
+    <script src="../js/supabase-client.js" defer></script>
+    <script src="../js/auth.js" defer></script>
+    <script src="js/login.js" defer></script>
+  </head>
+  <body class="login-page">
+    <main class="login-shell">
+      <section class="login-panel" aria-labelledby="login-heading">
+        <a class="brand login-brand" href="../" aria-label="Return to Pace Bros Visuals">
+          <img src="../assets/images/pace-bros-logo.png" alt="" width="48" height="48" />
+          <span>Pace Bros Visuals</span>
+        </a>
+
+        <div class="login-heading">
+          <p class="eyebrow">Private administration</p>
+          <h1 id="login-heading">Administrator login</h1>
+          <p>Use the existing Pace Bros administrator account. Public registration is not available.</p>
+        </div>
+
+        <form id="login-form" class="login-form" novalidate>
+          <label class="field" for="login-email">
+            <span>Email</span>
+            <input
+              id="login-email"
+              type="email"
+              autocomplete="email"
+              autocapitalize="none"
+              spellcheck="false"
+              disabled
+              required
+            />
+          </label>
+
+          <label class="field" for="login-password">
+            <span>Password</span>
+            <input
+              id="login-password"
+              type="password"
+              autocomplete="current-password"
+              disabled
+              required
+            />
+          </label>
+
+          <p id="login-message" class="login-message" role="alert" aria-live="polite"></p>
+
+          <button id="login-button" class="button login-button" type="submit" disabled>
+            <span id="login-button-label">Login</span>
+          </button>
+        </form>
+
+        <a class="back-link" href="../">Return to public site</a>
+      </section>
+    </main>
+  </body>
+</html>
