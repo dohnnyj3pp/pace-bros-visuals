@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="intro-active">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -22,15 +22,15 @@
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@200;300;400&family=Manrope:wght@300;400;500&display=swap"
     />
-    <link rel="stylesheet" href="css/main.css" />
-    <script src="js/main.js" defer></script>
+    <link rel="stylesheet" href="css/main.css?v=cinematic" />
+    <script src="js/main.js?v=cinematic" defer></script>
   </head>
   <body class="intro-active">
     <div class="grain-layer" aria-hidden="true"></div>
     <div class="screen-vignette" aria-hidden="true"></div>
     <div class="particle-layer" aria-hidden="true"></div>
 
-    <nav class="site-nav" aria-label="Primary navigation">
+    <nav class="site-nav" aria-label="Primary navigation" aria-hidden="true" inert>
       <div class="nav-inner">
         <a class="brand-link" href="#top" aria-label="Pace Bros Visuals — home">
           <img src="assets/images/pace-bros-logo.png" alt="Pace Bros Visuals logo" width="44" height="44" />
@@ -45,22 +45,29 @@
       </div>
     </nav>
 
-    <section id="top" class="hero" aria-labelledby="hero-title">
-      <img class="hero-image" src="assets/images/hero-atmosphere.jpg" alt="" width="1920" height="1088" />
-      <div class="hero-scrim" aria-hidden="true"></div>
-      <div class="fog-layer hero-fog" aria-hidden="true"></div>
-      <div class="hero-content">
-        <h1 id="hero-title" class="title-card title-emerge">Pace Bros Visuals</h1>
-        <div class="hero-rule line-draw" aria-hidden="true"></div>
-        <p class="eyebrow title-emerge hero-subtitle">AI Short Film Production</p>
-        <button id="enter-site" class="enter-button eyebrow title-emerge" type="button">
+    <section id="top" class="hero" aria-label="Pace Bros Visuals cinematic introduction">
+      <h1 class="visually-hidden">Pace Bros Visuals</h1>
+      <video id="intro-video" class="hero-video" preload="auto" playsinline loop aria-hidden="true">
+        <source src="assets/videos/pace-bros-visuals-master.mp4" type="video/mp4" />
+      </video>
+      <div class="hero-controls">
+        <button id="begin-cinematic" class="intro-button eyebrow" type="button" aria-controls="intro-video">
+          <span>Begin</span><i aria-hidden="true"></i>
+        </button>
+        <button
+          id="enter-site"
+          class="intro-button enter-button eyebrow"
+          type="button"
+          aria-controls="main-content"
+          aria-hidden="true"
+          disabled
+        >
           <span>Enter</span><i aria-hidden="true"></i>
         </button>
       </div>
-      <div class="hero-bottom-fade" aria-hidden="true"></div>
     </section>
 
-    <main id="main-content" aria-hidden="true">
+    <main id="main-content" aria-hidden="true" inert>
       <section id="films" class="films section-shell" aria-labelledby="films-heading">
         <div class="content-wide">
           <div class="reveal">

@@ -38,6 +38,19 @@ const stages = [
 
 const filmList = document.querySelector("#film-list");
 const processList = document.querySelector("#process-list");
+const root = document.documentElement;
+const body = document.body;
+const hero = document.querySelector(".hero");
+const siteNav = document.querySelector(".site-nav");
+const mainContent = document.querySelector("#main-content");
+const introVideo = document.querySelector("#intro-video");
+const beginButton = document.querySelector("#begin-cinematic");
+const enterButton = document.querySelector("#enter-site");
+const ENTER_REVEAL_DELAY = 8000;
+const HERO_EXIT_DURATION = 2300;
+
+let enterRevealTimer;
+let cinematicStarted = false;
 
 function renderFilms() {
   filmList.innerHTML = films
@@ -110,11 +123,55 @@ function createParticles() {
   }).join("");
 }
 
+function revealEnter() {
+  enterButton.disabled = false;
+  enterButton.removeAttribute("aria-hidden");
+  enterButton.classList.add("is-visible");
+}
+
+function resetBegin() {
+  cinematicStarted = false;
+  beginButton.disabled = false;
+  beginButton.classList.remove("is-hidden");
+}
+
+async function beginCinematic() {
+  if (cinematicStarted) return;
+
+  cinematicStarted = true;
+  beginButton.disabled = true;
+  beginButton.classList.add("is-hidden");
+  introVideo.pause();
+  introVideo.currentTime = 0;
+  introVideo.muted = false;
+  introVideo.defaultMuted = false;
+  introVideo.volume = 1;
+  enterRevealTimer = window.setTimeout(revealEnter, ENTER_REVEAL_DELAY);
+
+  try {
+    await introVideo.play();
+  } catch {
+    window.clearTimeout(enterRevealTimer);
+    resetBegin();
+  }
+}
+
 function enterSite() {
-  document.body.classList.remove("intro-active");
-  document.body.classList.add("entered");
-  document.querySelector("#main-content").removeAttribute("aria-hidden");
+  if (enterButton.disabled) return;
+
+  window.clearTimeout(enterRevealTimer);
+  root.classList.remove("intro-active");
+  body.classList.remove("intro-active");
+  body.classList.add("entered");
+  siteNav.removeAttribute("aria-hidden");
+  siteNav.removeAttribute("inert");
+  mainContent.removeAttribute("aria-hidden");
+  mainContent.removeAttribute("inert");
   window.setTimeout(() => document.querySelector("#films").scrollIntoView({ behavior: "smooth" }), 1400);
+  window.setTimeout(() => {
+    introVideo.pause();
+    hero.hidden = true;
+  }, HERO_EXIT_DURATION);
 }
 
 renderFilms();
@@ -122,7 +179,8 @@ renderStages();
 createParticles();
 prepareReveals();
 
-document.querySelector("#enter-site").addEventListener("click", enterSite);
+beginButton.addEventListener("click", beginCinematic);
+enterButton.addEventListener("click", enterSite);
 document.querySelectorAll(".process-stage").forEach((stage) => {
   stage.addEventListener("pointerenter", () => setActiveStage(stage));
   stage.addEventListener("focus", () => setActiveStage(stage));
