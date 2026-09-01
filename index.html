@@ -22,8 +22,16 @@
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@200;300;400&family=Manrope:wght@300;400;500&display=swap"
     />
-    <link rel="stylesheet" href="css/main.css?v=cinematic" />
-    <script src="js/main.js?v=cinematic" defer></script>
+    <link rel="stylesheet" href="css/main.css?v=phase2" />
+    <script src="js/config.js?v=phase2" defer></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.4"
+      integrity="sha384-yiVMs0R/Jyz7OhoXa/DsEMUSBLjEhr/QJta2ONO+zB6I8/GmNg/7AUFrZmAJV7KV"
+      crossorigin="anonymous"
+      defer
+    ></script>
+    <script src="js/supabase-client.js?v=phase2" defer></script>
+    <script src="js/main.js?v=phase2" defer></script>
   </head>
   <body class="intro-active">
     <div class="grain-layer" aria-hidden="true"></div>
@@ -75,7 +83,38 @@
             <p id="films-heading" class="eyebrow">Selected Works</p>
             <div class="hairline ember-line" aria-hidden="true"></div>
           </div>
-          <div id="film-list" class="film-list"></div>
+          <div class="selected-works-layout">
+            <aside class="film-catalogue reveal" data-delay="120" aria-label="Film catalogue">
+              <div class="film-catalogue-header">
+                <span class="eyebrow">Films</span>
+                <span id="film-count" class="eyebrow" aria-live="polite"></span>
+              </div>
+              <div id="film-list" class="film-list" role="list" aria-live="polite" aria-busy="true">
+                <p class="film-list-status">Loading selected works&hellip;</p>
+              </div>
+            </aside>
+
+            <div class="film-player-panel reveal" data-delay="240">
+              <div class="film-player-frame">
+                <video
+                  id="film-player"
+                  class="film-player"
+                  controls
+                  playsinline
+                  preload="metadata"
+                  aria-describedby="selected-film-description"
+                  hidden
+                ></video>
+                <div id="film-player-placeholder" class="film-player-placeholder" aria-live="polite">
+                  <span class="eyebrow">Choose a film</span>
+                </div>
+              </div>
+              <div class="film-player-copy">
+                <h2 id="selected-film-title" class="title-card">Selected Works</h2>
+                <p id="selected-film-description">Published films will appear here.</p>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 

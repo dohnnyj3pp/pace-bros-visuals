@@ -1,0 +1,22 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "pace-bros-media",
+  "main": "src/index.js",
+  "compatibility_date": "2026-08-31",
+  "workers_dev": true,
+  "observability": {
+    "enabled": true
+  },
+  "r2_buckets": [
+    {
+      "binding": "MEDIA_BUCKET",
+      "bucket_name": "pace-bros-media"
+    }
+  ],
+  "vars": {
+    "SUPABASE_URL": "https://dlpxhhhcrgttbpdqbxno.supabase.co",
+    "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_dQGqDdeAbpzBLa6BLiP_Jw_QXbhOUR-",
+    "ALLOWED_ORIGINS": "https://dohnnyj3pp.github.io",
+    "MAX_UPLOAD_BYTES": "95000000"
+  }
+}

@@ -1,44 +1,35 @@
-# Pace Bros Visuals admin — Phase 1 authentication
+# Pace Bros Visuals film administration
 
-The existing admin workspace remains a static, unlinked planning shell. Phase 1 adds Supabase email/password authentication and an `admin_users` authorization check before the workspace is revealed or initialized.
+The protected admin workspace is a vanilla HTML/CSS/JavaScript film CMS. It preserves the existing Supabase email/password login, persistent session, `admin_users` authorization check, and Logout flow.
 
-Uploads, storage, AI assistance, social integrations, scheduling, publishing, and analytics are intentionally not connected.
+## Film workflow
+
+Authorized administrators can:
+
+- list every row in `public.films`;
+- add or edit a film's title, description, poster, MP4, publication state, and sort order;
+- save a film as a draft or publish it;
+- return a published film to draft status;
+- replace media while retaining existing object keys when no replacement is selected.
+
+New poster and video files are sent directly to the Cloudflare Worker as raw request bodies. The browser includes the current Supabase access token and a generated film UUID. After both required uploads succeed, their returned R2 object keys are saved in the Supabase film row. Publishing is blocked until both a poster key and video key exist.
+
+The production-pass request limit is 95 MB per file. MP4 is accepted for video; JPEG, PNG, and WebP are accepted for posters.
 
 ## Browser-safe configuration
 
-The shared client uses only:
+The shared `../js/config.js` file exposes `window.PaceBrosConfig.workerBaseUrl`. Replace its placeholder with the deployed Worker origin before testing uploads. Do not add a trailing slash.
 
-- the Pace Bros Visuals Supabase project URL;
-- the browser-safe `sb_publishable_...` API key;
-- Supabase JS v2, exact-pinned to `2.112.4` with Subresource Integrity.
+The Supabase project URL and browser-safe publishable key remain in `../js/supabase-client.js`. Never add a secret key, `service_role` key, database password, R2 S3 credential, user password, or other private credential to this repository.
 
-The publishable key is expected to be visible in this static site. Security comes from Supabase Auth, the matching UUID authorization row, database grants, and Row Level Security. Never add a secret key, `service_role` key, database password, user password, or private backend credential to this repository.
+## Security boundary
 
-## Authentication and authorization flow
-
-1. `admin/login.html` calls `supabase.auth.signInWithPassword()` with the submitted email and password.
-2. The authenticated user's UUID is read from the validated Supabase user.
-3. The browser queries `public.admin_users` for that exact `user_id` and selects only `user_id` and `display_name`.
-4. Row Level Security must allow an authenticated user to read only their own authorization row.
-5. A matching row allows navigation to `/admin/`.
-6. The admin page repeats the session and authorization check on every load before revealing or initializing the existing workspace.
-7. A missing authorization row signs the user out locally and denies access.
-8. A network or authorization-query error keeps the workspace hidden and offers a retry.
-
-There is no Sign Up or self-promotion flow. The browser never inserts, updates, deletes, or upserts `admin_users` records.
+The admin page is revealed only after the existing authenticated user's UUID has a matching `public.admin_users` row. Database writes are additionally protected by the `films` Row Level Security policies. The Worker independently validates the Bearer token and administrator membership before uploads or deletes. Frontend checks are workflow safeguards, not the authorization boundary.
 
 ## GitHub Pages paths
 
-All site links and redirects are document-relative so the repository prefix is preserved:
+All scripts, styles, links, and redirects remain document-relative so the project prefix is preserved:
 
 - public site: `https://dohnnyj3pp.github.io/pace-bros-visuals/`
 - login: `https://dohnnyj3pp.github.io/pace-bros-visuals/admin/login.html`
 - protected admin: `https://dohnnyj3pp.github.io/pace-bros-visuals/admin/`
-
-The older `js/api.js` file is deliberately not loaded in Phase 1. Its root-relative `/api/admin` placeholder is not compatible with GitHub Pages and belongs to a future backend phase.
-
-## Static-host security boundary
-
-The HTML, CSS, JavaScript, and publishable key are public. Hiding the admin shell prevents a UI flash and blocks local initialization before authorization, but it is not the data-security boundary. Every future database or storage operation must have its own least-privilege RLS policy.
-
-Supabase sessions persist in browser storage so refreshes can restore a valid session. Because GitHub Pages projects under the same `dohnnyj3pp.github.io` host share an origin, a dedicated custom domain would provide stronger session isolation in a future infrastructure phase.

@@ -4,11 +4,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex, nofollow, noarchive" />
-    <meta
-      name="description"
-      content="Private content workspace for Pace Bros Visuals."
-    />
-    <title>Pace Bros Visuals — Content Workspace</title>
+    <meta name="description" content="Private film administration for Pace Bros Visuals." />
+    <title>Pace Bros Visuals — Film Administration</title>
     <link rel="icon" href="../assets/images/favicon.ico" sizes="any" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -23,6 +20,7 @@
       crossorigin="anonymous"
       defer
     ></script>
+    <script src="../js/config.js" defer></script>
     <script src="../js/supabase-client.js" defer></script>
     <script src="../js/auth.js" defer></script>
     <script src="js/admin.js" defer></script>
@@ -50,8 +48,8 @@
 
       <header class="topbar">
         <a class="brand" href="../" aria-label="Open the Pace Bros Visuals public site">
-        <img src="../assets/images/pace-bros-logo.png" alt="" width="40" height="40" />
-        <span>Pace Bros Visuals</span>
+          <img src="../assets/images/pace-bros-logo.png" alt="" width="40" height="40" />
+          <span>Pace Bros Visuals</span>
         </a>
         <div class="topbar-actions">
           <div id="connection-status" class="connection-status is-connected" role="status" aria-live="polite">
@@ -62,172 +60,144 @@
         </div>
       </header>
 
-    <div class="admin-shell">
-      <aside class="sidebar" aria-labelledby="workspace-name">
-        <p class="eyebrow">Admin foundation</p>
-        <h1 id="workspace-name">Content workspace</h1>
-        <p class="sidebar-intro">
-          Prepare films, assets, and automation requests without changing the public landing page.
-        </p>
-
-        <nav class="workspace-nav" aria-label="Admin workspace">
-          <a href="#library"><span>01</span> Film library</a>
-          <a href="#editor"><span>02</span> New draft</a>
-          <a href="#automation"><span>03</span> AI assistance</a>
-        </nav>
-
-        <section class="access-note" aria-labelledby="access-heading">
-          <h2 id="access-heading">Access boundary</h2>
-          <p id="access-copy">
-            Supabase verified this session and its matching administrator authorization row.
-          </p>
-        </section>
-      </aside>
-
-      <main id="workspace" class="workspace">
-        <header class="workspace-header">
-          <div>
-            <p class="eyebrow">Increment 01</p>
-            <h2>Prepare the next release</h2>
-          </div>
-          <p>
-            This authenticated Phase 1 shell remains a planning workspace. Nothing is uploaded,
-            saved, sent to AI, or published yet.
-          </p>
-        </header>
-
-        <section id="library" class="panel library-panel" aria-labelledby="library-heading">
-          <div class="panel-heading">
-            <div>
-              <p class="eyebrow">Public site</p>
-              <h2 id="library-heading">Current film library</h2>
+      <div class="admin-shell">
+        <aside class="sidebar">
+          <nav class="workspace-nav" aria-label="Admin workspace">
+            <div class="nav-group">
+              <p>Content</p>
+              <button class="nav-item is-active" type="button" data-view="films">Films</button>
+              <button class="nav-item" type="button" data-view="clips">Clips <span>Coming soon</span></button>
             </div>
-            <span class="read-only-badge">Read only</span>
-          </div>
+            <div class="nav-group">
+              <p>Publishing</p>
+              <button class="nav-item" type="button" data-view="social-media">Social Media <span>Coming soon</span></button>
+              <button class="nav-item" type="button" data-view="automation">Automation <span>Coming soon</span></button>
+            </div>
+            <div class="nav-group">
+              <p>System</p>
+              <button class="nav-item" type="button" data-view="settings">Settings</button>
+            </div>
+          </nav>
+        </aside>
 
-          <ol class="film-list">
-            <li><span>01</span><strong>The Signal</strong><small>2026 · 07:12</small></li>
-            <li><span>02</span><strong>Null</strong><small>2026 · 04:48</small></li>
-            <li><span>03</span><strong>The Last Frame</strong><small>2025 · 09:03</small></li>
-          </ol>
-          <p class="panel-note">
-            These entries mirror the current hard-coded landing-page content. The public renderer is not connected to this panel yet.
-          </p>
-        </section>
-
-        <div class="editor-grid">
-          <section id="editor" class="panel" aria-labelledby="editor-heading">
-            <div class="panel-heading">
+        <main id="workspace" class="workspace">
+          <section id="films-view" class="workspace-view" data-workspace-view="films">
+            <header class="workspace-header">
               <div>
-                <p class="eyebrow">Draft</p>
-                <h2 id="editor-heading">Film details</h2>
+                <p class="eyebrow">Content</p>
+                <h1>Film Library</h1>
               </div>
-              <span class="draft-badge">Unsaved</span>
-            </div>
+              <button id="add-film-button" class="button button-publish" type="button">+ Add New Film</button>
+            </header>
 
-            <form id="film-form" novalidate>
-              <div class="field-row">
-                <label class="field">
+            <p id="library-feedback" class="feedback" role="status" aria-live="polite"></p>
+
+            <section class="panel library-panel" aria-labelledby="film-library-heading">
+              <h2 id="film-library-heading" class="visually-hidden">Films</h2>
+              <div class="film-table-wrap">
+                <table class="film-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Title</th>
+                      <th scope="col">Status</th>
+                      <th scope="col">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="film-table-body"></tbody>
+                </table>
+              </div>
+              <div id="library-state" class="library-state">Loading films…</div>
+            </section>
+
+            <section id="film-editor" class="panel editor-panel" aria-labelledby="editor-heading" hidden>
+              <div class="panel-heading">
+                <div>
+                  <p id="editor-eyebrow" class="eyebrow">New film</p>
+                  <h2 id="editor-heading">Add Film</h2>
+                </div>
+                <button id="close-editor-button" class="text-button" type="button">Close</button>
+              </div>
+
+              <form id="film-form" novalidate>
+                <input id="film-id" name="id" type="hidden" />
+                <input id="current-poster-key" name="current_poster_key" type="hidden" />
+                <input id="current-video-key" name="current_video_key" type="hidden" />
+
+                <label class="field" for="title">
                   <span>Title</span>
-                  <input id="title" name="title" type="text" maxlength="80" autocomplete="off" required />
+                  <input id="title" name="title" type="text" maxlength="160" autocomplete="off" required />
                 </label>
-                <label class="field">
-                  <span>Slug</span>
-                  <input
-                    id="slug"
-                    name="slug"
-                    type="text"
-                    maxlength="80"
-                    pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
-                    placeholder="generated-from-title"
-                    autocomplete="off"
-                    required
-                  />
-                </label>
-              </div>
 
-              <label class="field">
-                <span>Logline</span>
-                <textarea id="logline" name="logline" rows="3" maxlength="180" required></textarea>
-                <small><span id="logline-count">0</span>/180 characters</small>
-              </label>
+                <label class="field" for="description">
+                  <span>Description / Logline</span>
+                  <textarea id="description" name="description" rows="4" maxlength="1200"></textarea>
+                </label>
 
-              <div class="field-row field-row-three">
-                <label class="field">
-                  <span>Year</span>
-                  <input id="year" name="year" type="number" min="2020" max="2100" inputmode="numeric" required />
-                </label>
-                <label class="field">
-                  <span>Runtime</span>
-                  <input id="runtime" name="runtime" type="text" inputmode="numeric" pattern="[0-9]{2}:[0-9]{2}" placeholder="07:12" required />
-                </label>
-                <label class="field">
-                  <span>Format</span>
-                  <input id="format" name="format" type="text" maxlength="50" placeholder="Generative / 2.39:1" required />
-                </label>
-              </div>
+                <div class="asset-grid">
+                  <label class="file-field" for="poster-file">
+                    <span>Poster Image</span>
+                    <input id="poster-file" name="poster" type="file" accept="image/jpeg,image/png,image/webp" />
+                    <small id="poster-summary">Choose a JPG, PNG, or WebP file.</small>
+                  </label>
 
-              <fieldset class="asset-fields">
-                <legend>Assets</legend>
-                <label class="file-field">
-                  <span>Poster image</span>
-                  <input id="poster-file" name="poster" type="file" accept="image/jpeg,image/png,image/webp" />
-                  <small id="poster-summary">Choose a JPG, PNG, or WebP file.</small>
-                </label>
-                <label class="file-field">
-                  <span>Preview video</span>
-                  <input id="preview-file" name="preview" type="file" accept="video/mp4,video/webm" />
-                  <small id="preview-summary">Choose an MP4 or WebM file.</small>
-                </label>
-                <p class="privacy-note">Selected files stay on this device until signed uploads are connected.</p>
-              </fieldset>
+                  <label class="file-field" for="video-file">
+                    <span>Video</span>
+                    <input id="video-file" name="video" type="file" accept="video/mp4" />
+                    <small id="video-summary">Choose an MP4 file.</small>
+                  </label>
+                </div>
 
-              <fieldset id="automation" class="automation-fields">
-                <legend>AI assistance to request</legend>
-                <label><input name="automation" type="checkbox" value="logline" /> Refine the logline</label>
-                <label><input name="automation" type="checkbox" value="alt-text" /> Draft accessible alt text</label>
-                <label><input name="automation" type="checkbox" value="social-copy" /> Draft social captions</label>
-                <label><input name="automation" type="checkbox" value="tags" /> Suggest searchable tags</label>
-              </fieldset>
+                <div class="field-row">
+                  <label class="field" for="publication-status">
+                    <span>Publication Status</span>
+                    <select id="publication-status" name="publication_status">
+                      <option value="draft">Draft</option>
+                      <option value="published">Published</option>
+                    </select>
+                    <small>The action used below determines the saved status.</small>
+                  </label>
 
-              <div class="form-actions">
-                <button id="review-draft" class="button button-secondary" type="submit">Review draft</button>
-                <button class="button" type="button" data-requires-session disabled>Upload assets</button>
-                <button class="button" type="button" data-requires-session disabled>Run AI assist</button>
-                <button class="button" type="button" data-requires-session disabled>Save draft</button>
-                <button class="button button-publish" type="button" data-requires-saved-draft disabled>Publish</button>
-              </div>
-            </form>
+                  <label class="field" for="sort-order">
+                    <span>Sort Order</span>
+                    <input id="sort-order" name="sort_order" type="number" inputmode="numeric" step="1" value="0" />
+                  </label>
+                </div>
+
+                <p id="form-feedback" class="feedback" role="status" aria-live="polite"></p>
+
+                <div class="form-actions">
+                  <button id="cancel-edit-button" class="button button-secondary" type="button">Cancel</button>
+                  <button id="save-draft-button" class="button button-secondary" type="submit" data-publish="false">Save Draft</button>
+                  <button id="publish-film-button" class="button button-publish" type="submit" data-publish="true">Publish Film</button>
+                </div>
+              </form>
+            </section>
           </section>
 
-          <aside class="panel review-panel" aria-labelledby="review-heading">
-            <div class="panel-heading">
+          <section id="placeholder-view" class="workspace-view" data-workspace-view="placeholder" hidden>
+            <div class="placeholder-panel">
+              <p id="placeholder-eyebrow" class="eyebrow">Content</p>
+              <h1 id="placeholder-title">Clips</h1>
+              <p id="placeholder-copy">Coming soon.</p>
+            </div>
+          </section>
+
+          <section id="settings-view" class="workspace-view" data-workspace-view="settings" hidden>
+            <header class="workspace-header">
               <div>
-                <p class="eyebrow">Human review</p>
-                <h2 id="review-heading">Draft check</h2>
+                <p class="eyebrow">System</p>
+                <h1>Settings</h1>
               </div>
-            </div>
-            <p id="review-status" class="review-status" aria-live="polite">
-              Complete the form, then review the draft before any future save or publish action.
-            </p>
-            <dl class="review-list">
-              <div><dt>Title</dt><dd id="review-title">Not reviewed</dd></div>
-              <div><dt>Slug</dt><dd id="review-slug">—</dd></div>
-              <div><dt>Release</dt><dd id="review-release">—</dd></div>
-              <div><dt>Assets</dt><dd id="review-assets">No files selected</dd></div>
-              <div><dt>AI requests</dt><dd id="review-automation">None selected</dd></div>
-            </dl>
-            <div class="workflow-note">
-              <p class="eyebrow">Future controlled flow</p>
-              <ol>
-                <li>Save a private draft</li>
-                <li>Upload to protected storage</li>
-                <li>Review AI suggestions</li>
-                <li>Approve and publish</li>
-              </ol>
-            </div>
-          </aside>
-        </div>
+            </header>
+            <section class="panel settings-panel">
+              <h2>Administrator session</h2>
+              <dl>
+                <div><dt>Name</dt><dd id="settings-name">Authorized administrator</dd></div>
+                <div><dt>Email</dt><dd id="settings-email">—</dd></div>
+                <div><dt>Media service</dt><dd id="settings-worker">Not configured</dd></div>
+              </dl>
+            </section>
+          </section>
         </main>
       </div>
     </div>
