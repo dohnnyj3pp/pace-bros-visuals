@@ -16,7 +16,7 @@
   "vars": {
     "SUPABASE_URL": "https://dlpxhhhcrgttbpdqbxno.supabase.co",
     "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_dQGqDdeAbpzBLa6BLiP_Jw_QXbhOUR-",
-    "ALLOWED_ORIGINS": "https://dohnnyj3pp.github.io",
+    "ALLOWED_ORIGINS": "https://dohnnyj3pp.github.io,https://pacebrosvisuals.ca,https://www.pacebrosvisuals.ca",
     "MAX_UPLOAD_BYTES": "95000000"
   }
 }
