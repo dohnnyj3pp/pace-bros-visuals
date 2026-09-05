@@ -21,7 +21,7 @@ const mainContent = document.querySelector("#main-content");
 const introVideo = document.querySelector("#intro-video");
 const beginButton = document.querySelector("#begin-cinematic");
 const enterButton = document.querySelector("#enter-site");
-const ENTER_REVEAL_DELAY = 8000;
+const ENTER_REVEAL_DELAY = 4000;
 const HERO_EXIT_DURATION = 2300;
 
 let enterRevealTimer;

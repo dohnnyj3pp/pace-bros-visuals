@@ -50,6 +50,7 @@
         document.querySelectorAll("[data-workspace-view]"),
       ),
       filmsView: document.querySelector("#films-view"),
+      analyticsView: document.querySelector("#analytics-view"),
       placeholderView: document.querySelector("#placeholder-view"),
       settingsView: document.querySelector("#settings-view"),
       placeholderEyebrow: document.querySelector(
@@ -142,6 +143,12 @@
     elements.settingsWorker.textContent =
       workerBaseUrl ? "Configured" : "Not configured";
 
+    const analyticsController =
+      global.PaceAdminAnalytics?.createController({
+        client,
+        workerBaseUrl,
+      }) || { ensureLoaded() {} };
+
     function getFilm(filmId) {
       return (
         state.films.find(
@@ -201,9 +208,11 @@
 
       const targetView = isPlaceholder
         ? elements.placeholderView
-        : viewName === "settings"
-          ? elements.settingsView
-          : elements.filmsView;
+        : viewName === "analytics"
+          ? elements.analyticsView
+          : viewName === "settings"
+            ? elements.settingsView
+            : elements.filmsView;
 
       elements.views.forEach((view) => {
         view.hidden = view !== targetView;
@@ -223,6 +232,11 @@
           isActive ? "page" : "false",
         );
       });
+
+      if (viewName === "analytics") {
+        analyticsController.ensureLoaded();
+        return;
+      }
 
       if (!isPlaceholder) return;
 

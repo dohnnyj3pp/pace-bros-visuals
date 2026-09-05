@@ -1,6 +1,24 @@
 const MEDIA_ROUTE_PREFIX = "/media/";
-const DEFAULT_ALLOWED_ORIGIN = "https://dohnnyj3pp.github.io";
+const ADMIN_ANALYTICS_ROUTE = "/admin/analytics";
+const DEFAULT_ALLOWED_ORIGIN = "https://pacebrosvisuals.ca";
 const DEFAULT_MAX_UPLOAD_BYTES = 95_000_000;
+const DEFAULT_REALTIME_CACHE_SECONDS = 60;
+const DEFAULT_HISTORICAL_CACHE_SECONDS = 300;
+const GOOGLE_ANALYTICS_SCOPE =
+  "https://www.googleapis.com/auth/analytics.readonly";
+const GOOGLE_OAUTH_TOKEN_URL =
+  "https://oauth2.googleapis.com/token";
+const GOOGLE_ANALYTICS_API_ORIGIN =
+  "https://analyticsdata.googleapis.com";
+const ANALYTICS_CACHE_ORIGIN =
+  "https://pace-bros-analytics-cache.internal";
+const TOP_CONTENT_LIMIT = 8;
+const TRAFFIC_SOURCE_LIMIT = 8;
+
+let googleAccessTokenCache = null;
+let googleAccessTokenInFlight = null;
+const analyticsMemoryCache = new Map();
+const analyticsPartRequestsInFlight = new Map();
 
 const ALLOWED_METHODS = new Set([
   "GET",
@@ -68,11 +86,15 @@ class HttpError extends Error {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, executionContext) {
     let response;
 
     try {
-      response = await routeRequest(request, env);
+      response = await routeRequest(
+        request,
+        env,
+        executionContext,
+      );
     } catch (error) {
       if (error instanceof HttpError) {
         response = errorResponse(
@@ -95,11 +117,32 @@ export default {
   },
 };
 
-async function routeRequest(request, env) {
+async function routeRequest(
+  request,
+  env,
+  executionContext,
+) {
   const url = new URL(request.url);
 
   if (request.method === "OPTIONS") {
     return handlePreflight(request, env);
+  }
+
+  if (url.pathname === ADMIN_ANALYTICS_ROUTE) {
+    if (request.method !== "GET") {
+      throw new HttpError(
+        405,
+        "method_not_allowed",
+        "This analytics route only accepts GET requests.",
+        { Allow: "GET, OPTIONS" },
+      );
+    }
+
+    return handleAdminAnalytics(
+      request,
+      env,
+      executionContext,
+    );
   }
 
   if (url.pathname === "/upload/video/multipart/create") {
@@ -627,6 +670,1042 @@ async function serveMedia(request, env, objectKey) {
       status: 206,
       headers,
     },
+  );
+}
+
+async function handleAdminAnalytics(
+  request,
+  env,
+  executionContext,
+) {
+  assertAdminRequestOrigin(request, env);
+  await authorizeAdmin(request, env);
+
+  const analytics = await getAnalyticsSnapshot(
+    env,
+    executionContext,
+  );
+
+  return jsonResponse(analytics, {
+    headers: {
+      "Cache-Control": "private, no-store",
+    },
+  });
+}
+
+async function getAnalyticsSnapshot(
+  env,
+  executionContext,
+) {
+  const { propertyId, credentials } =
+    readAnalyticsConfiguration(env);
+
+  const [realtimePart, historicalPart] =
+    await Promise.all([
+      getAnalyticsPart(
+        "realtime",
+        propertyId,
+        getRealtimeCacheSeconds(env),
+        () =>
+          fetchRealtimeAnalyticsPart(
+            propertyId,
+            credentials,
+          ),
+        executionContext,
+      ),
+      getAnalyticsPart(
+        "historical",
+        propertyId,
+        getHistoricalCacheSeconds(env),
+        () =>
+          fetchHistoricalAnalyticsPart(
+            propertyId,
+            credentials,
+          ),
+        executionContext,
+      ),
+    ]);
+
+  return {
+    generatedAt: realtimePart.generatedAt,
+    realtime: realtimePart.data.realtime,
+    today: historicalPart.data.today,
+    last7Days: historicalPart.data.last7Days,
+    last30Days: historicalPart.data.last30Days,
+    topContent: historicalPart.data.topContent,
+    trafficSources:
+      historicalPart.data.trafficSources,
+  };
+}
+
+async function getAnalyticsPart(
+  partName,
+  propertyId,
+  cacheSeconds,
+  loadPart,
+  executionContext,
+) {
+  const cacheId = `${partName}:${propertyId}`;
+  const now = Date.now();
+  const memoryEntry =
+    analyticsMemoryCache.get(cacheId);
+
+  if (
+    memoryEntry &&
+    memoryEntry.expiresAt > now
+  ) {
+    return memoryEntry;
+  }
+
+  const cache = getDefaultWorkerCache();
+  const cacheKey = new Request(
+    `${ANALYTICS_CACHE_ORIGIN}/v1/${partName}/${propertyId}`,
+    { method: "GET" },
+  );
+
+  if (cache) {
+    try {
+      const cachedResponse =
+        await cache.match(cacheKey);
+
+      if (cachedResponse) {
+        const cachedEntry =
+          await parseJson(cachedResponse);
+
+        if (
+          isAnalyticsCacheEntry(
+            cachedEntry,
+            partName,
+          )
+        ) {
+          analyticsMemoryCache.set(
+            cacheId,
+            cachedEntry,
+          );
+
+          return cachedEntry;
+        }
+      }
+    } catch (error) {
+      console.error(
+        "Unable to read the analytics edge cache",
+        error,
+      );
+    }
+  }
+
+  const pending =
+    analyticsPartRequestsInFlight.get(cacheId);
+
+  if (pending) {
+    return pending;
+  }
+
+  const refresh = (async () => {
+    const data = await loadPart();
+    const generatedAt = new Date().toISOString();
+    const entry = {
+      generatedAt,
+      expiresAt:
+        Date.now() + cacheSeconds * 1000,
+      data,
+    };
+
+    analyticsMemoryCache.set(cacheId, entry);
+
+    if (cache) {
+      const cacheWrite = cache
+        .put(
+          cacheKey,
+          jsonResponse(entry, {
+            headers: {
+              "Cache-Control":
+                `public, max-age=${cacheSeconds}`,
+            },
+          }),
+        )
+        .catch((error) => {
+          console.error(
+            "Unable to write the analytics edge cache",
+            error,
+          );
+        });
+
+      if (
+        executionContext &&
+        typeof executionContext.waitUntil ===
+          "function"
+      ) {
+        executionContext.waitUntil(cacheWrite);
+      } else {
+        await cacheWrite;
+      }
+    }
+
+    return entry;
+  })();
+
+  analyticsPartRequestsInFlight.set(
+    cacheId,
+    refresh,
+  );
+
+  try {
+    return await refresh;
+  } finally {
+    if (
+      analyticsPartRequestsInFlight.get(
+        cacheId,
+      ) === refresh
+    ) {
+      analyticsPartRequestsInFlight.delete(
+        cacheId,
+      );
+    }
+  }
+}
+
+async function fetchRealtimeAnalyticsPart(
+  propertyId,
+  credentials,
+) {
+  const accessToken =
+    await getGoogleAccessToken(credentials);
+
+  const report = await requestGoogleAnalytics(
+    `${GOOGLE_ANALYTICS_API_ORIGIN}/v1beta/properties/${propertyId}:runRealtimeReport`,
+    accessToken,
+    {
+      metrics: [
+        { name: "activeUsers" },
+        { name: "screenPageViews" },
+        { name: "eventCount" },
+      ],
+    },
+    "realtime report",
+  );
+
+  return {
+    realtime: {
+      activeUsers: reportCount(
+        report,
+        "activeUsers",
+      ),
+      views: reportCount(
+        report,
+        "screenPageViews",
+      ),
+      eventCount: reportCount(
+        report,
+        "eventCount",
+      ),
+    },
+  };
+}
+
+async function fetchHistoricalAnalyticsPart(
+  propertyId,
+  credentials,
+) {
+  const accessToken =
+    await getGoogleAccessToken(credentials);
+
+  const summaryMetrics = [
+    { name: "totalUsers" },
+    { name: "newUsers" },
+    { name: "sessions" },
+    { name: "screenPageViews" },
+    { name: "activeUsers" },
+    { name: "userEngagementDuration" },
+    { name: "eventCount" },
+  ];
+
+  const batch = await requestGoogleAnalytics(
+    `${GOOGLE_ANALYTICS_API_ORIGIN}/v1beta/properties/${propertyId}:batchRunReports`,
+    accessToken,
+    {
+      requests: [
+        {
+          dateRanges: [
+            {
+              startDate: "today",
+              endDate: "today",
+            },
+          ],
+          metrics: summaryMetrics,
+        },
+        {
+          dateRanges: [
+            {
+              startDate: "6daysAgo",
+              endDate: "today",
+            },
+          ],
+          metrics: summaryMetrics,
+        },
+        {
+          dateRanges: [
+            {
+              startDate: "29daysAgo",
+              endDate: "today",
+            },
+          ],
+          metrics: summaryMetrics,
+        },
+        {
+          dateRanges: [
+            {
+              startDate: "29daysAgo",
+              endDate: "today",
+            },
+          ],
+          dimensions: [
+            { name: "pageTitle" },
+            { name: "pagePath" },
+          ],
+          metrics: [
+            { name: "screenPageViews" },
+          ],
+          orderBys: [
+            {
+              metric: {
+                metricName:
+                  "screenPageViews",
+              },
+              desc: true,
+            },
+          ],
+          limit: String(TOP_CONTENT_LIMIT),
+        },
+        {
+          dateRanges: [
+            {
+              startDate: "29daysAgo",
+              endDate: "today",
+            },
+          ],
+          dimensions: [
+            { name: "sessionSource" },
+            { name: "sessionMedium" },
+          ],
+          metrics: [
+            { name: "sessions" },
+            { name: "totalUsers" },
+          ],
+          orderBys: [
+            {
+              metric: {
+                metricName: "sessions",
+              },
+              desc: true,
+            },
+          ],
+          limit: String(
+            TRAFFIC_SOURCE_LIMIT,
+          ),
+        },
+      ],
+    },
+    "historical reports",
+  );
+
+  if (
+    !Array.isArray(batch?.reports) ||
+    batch.reports.length < 5
+  ) {
+    throw analyticsUnavailable();
+  }
+
+  const [
+    todayReport,
+    last7DaysReport,
+    last30DaysReport,
+    topContentReport,
+    trafficSourcesReport,
+  ] = batch.reports;
+
+  const today = normalizeHistoricalSummary(
+    todayReport,
+  );
+  const last7Days =
+    normalizeHistoricalSummary(
+      last7DaysReport,
+    );
+  const last30Days =
+    normalizeHistoricalSummary(
+      last30DaysReport,
+    );
+
+  return {
+    today,
+    last7Days,
+    last30Days,
+    topContent: normalizeTopContent(
+      topContentReport,
+    ),
+    trafficSources: normalizeTrafficSources(
+      trafficSourcesReport,
+      last30Days.sessions,
+    ),
+  };
+}
+
+async function requestGoogleAnalytics(
+  url,
+  accessToken,
+  body,
+  reportName,
+) {
+  let response;
+
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+  } catch (error) {
+    console.error(
+      `Google Analytics ${reportName} request failed`,
+      error,
+    );
+
+    throw analyticsUnavailable();
+  }
+
+  if (!response.ok) {
+    console.error(
+      `Google Analytics ${reportName} returned HTTP ${response.status}`,
+    );
+
+    throw analyticsUnavailable();
+  }
+
+  const payload = await parseJson(response);
+
+  if (!payload || typeof payload !== "object") {
+    throw analyticsUnavailable();
+  }
+
+  return payload;
+}
+
+async function getGoogleAccessToken(credentials) {
+  const now = Date.now();
+
+  if (
+    googleAccessTokenCache?.clientEmail ===
+      credentials.clientEmail &&
+    googleAccessTokenCache.expiresAt >
+      now + 30_000
+  ) {
+    return googleAccessTokenCache.token;
+  }
+
+  if (
+    googleAccessTokenInFlight?.clientEmail ===
+    credentials.clientEmail
+  ) {
+    return googleAccessTokenInFlight.promise;
+  }
+
+  const tokenRequest =
+    fetchGoogleAccessToken(credentials);
+
+  googleAccessTokenInFlight = {
+    clientEmail: credentials.clientEmail,
+    promise: tokenRequest,
+  };
+
+  try {
+    return await tokenRequest;
+  } finally {
+    if (
+      googleAccessTokenInFlight?.promise ===
+      tokenRequest
+    ) {
+      googleAccessTokenInFlight = null;
+    }
+  }
+}
+
+async function fetchGoogleAccessToken(
+  credentials,
+) {
+  const assertion =
+    await createServiceAccountAssertion(
+      credentials,
+    );
+
+  const form = new URLSearchParams();
+  form.set(
+    "grant_type",
+    "urn:ietf:params:oauth:grant-type:jwt-bearer",
+  );
+  form.set("assertion", assertion);
+
+  let response;
+
+  try {
+    response = await fetch(
+      GOOGLE_OAUTH_TOKEN_URL,
+      {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type":
+            "application/x-www-form-urlencoded",
+        },
+        body: form,
+      },
+    );
+  } catch (error) {
+    console.error(
+      "Google OAuth token request failed",
+      error,
+    );
+
+    throw analyticsAuthenticationFailed();
+  }
+
+  const payload = await parseJson(response);
+
+  if (
+    !response.ok ||
+    typeof payload?.access_token !== "string" ||
+    !payload.access_token
+  ) {
+    console.error(
+      `Google OAuth returned HTTP ${response.status}`,
+    );
+
+    throw analyticsAuthenticationFailed();
+  }
+
+  const expiresIn = Number(
+    payload.expires_in ?? 3600,
+  );
+  const safeExpiresIn =
+    Number.isFinite(expiresIn) &&
+    expiresIn > 120
+      ? expiresIn
+      : 3600;
+
+  googleAccessTokenCache = {
+    clientEmail: credentials.clientEmail,
+    token: payload.access_token,
+    expiresAt:
+      Date.now() +
+      (safeExpiresIn - 60) * 1000,
+  };
+
+  return payload.access_token;
+}
+
+async function createServiceAccountAssertion(
+  credentials,
+) {
+  const issuedAt = Math.floor(
+    Date.now() / 1000,
+  );
+  const header = {
+    alg: "RS256",
+    typ: "JWT",
+  };
+
+  if (credentials.privateKeyId) {
+    header.kid = credentials.privateKeyId;
+  }
+
+  const claims = {
+    iss: credentials.clientEmail,
+    scope: GOOGLE_ANALYTICS_SCOPE,
+    aud: GOOGLE_OAUTH_TOKEN_URL,
+    iat: issuedAt,
+    exp: issuedAt + 3600,
+  };
+
+  const unsignedToken =
+    `${encodeBase64UrlJson(header)}.` +
+    encodeBase64UrlJson(claims);
+
+  let privateKey;
+  let signature;
+
+  try {
+    privateKey = await crypto.subtle.importKey(
+      "pkcs8",
+      decodePem(credentials.privateKey),
+      {
+        name: "RSASSA-PKCS1-v1_5",
+        hash: "SHA-256",
+      },
+      false,
+      ["sign"],
+    );
+
+    signature = await crypto.subtle.sign(
+      "RSASSA-PKCS1-v1_5",
+      privateKey,
+      new TextEncoder().encode(
+        unsignedToken,
+      ),
+    );
+  } catch (error) {
+    console.error(
+      "Google service-account signing failed",
+      error,
+    );
+
+    throw analyticsNotConfigured();
+  }
+
+  return (
+    `${unsignedToken}.` +
+    encodeBase64UrlBytes(
+      new Uint8Array(signature),
+    )
+  );
+}
+
+function readAnalyticsConfiguration(env) {
+  const propertyId = String(
+    env.GA4_PROPERTY_ID ?? "",
+  ).trim();
+  const rawCredentials = String(
+    env.GOOGLE_SERVICE_ACCOUNT_JSON ?? "",
+  ).trim();
+
+  if (
+    !/^\d{1,32}$/.test(propertyId) ||
+    !rawCredentials
+  ) {
+    throw analyticsNotConfigured();
+  }
+
+  let serviceAccount;
+
+  try {
+    serviceAccount = JSON.parse(
+      rawCredentials,
+    );
+  } catch {
+    throw analyticsNotConfigured();
+  }
+
+  const clientEmail = String(
+    serviceAccount?.client_email ?? "",
+  ).trim();
+  const privateKey = String(
+    serviceAccount?.private_key ?? "",
+  ).trim();
+  const privateKeyId = String(
+    serviceAccount?.private_key_id ?? "",
+  ).trim();
+
+  if (
+    serviceAccount?.type !==
+      "service_account" ||
+    !/^\S+@\S+$/.test(clientEmail) ||
+    !privateKey.includes(
+      "-----BEGIN PRIVATE KEY-----",
+    ) ||
+    !privateKey.includes(
+      "-----END PRIVATE KEY-----",
+    )
+  ) {
+    throw analyticsNotConfigured();
+  }
+
+  return {
+    propertyId,
+    credentials: {
+      clientEmail,
+      privateKey,
+      privateKeyId,
+    },
+  };
+}
+
+function getRealtimeCacheSeconds(env) {
+  return getBoundedCacheSeconds(
+    env.ANALYTICS_REALTIME_CACHE_SECONDS,
+    DEFAULT_REALTIME_CACHE_SECONDS,
+    30,
+    120,
+  );
+}
+
+function getHistoricalCacheSeconds(env) {
+  return getBoundedCacheSeconds(
+    env.ANALYTICS_HISTORICAL_CACHE_SECONDS,
+    DEFAULT_HISTORICAL_CACHE_SECONDS,
+    120,
+    1800,
+  );
+}
+
+function getBoundedCacheSeconds(
+  configured,
+  fallback,
+  minimum,
+  maximum,
+) {
+  const seconds = Number(configured);
+
+  return Number.isSafeInteger(seconds) &&
+    seconds >= minimum &&
+    seconds <= maximum
+    ? seconds
+    : fallback;
+}
+
+function normalizeHistoricalSummary(report) {
+  const activeUsers = reportNumber(
+    report,
+    "activeUsers",
+  );
+  const userEngagementDuration =
+    reportNumber(
+      report,
+      "userEngagementDuration",
+    );
+
+  return {
+    totalUsers: reportCount(
+      report,
+      "totalUsers",
+    ),
+    newUsers: reportCount(
+      report,
+      "newUsers",
+    ),
+    sessions: reportCount(
+      report,
+      "sessions",
+    ),
+    views: reportCount(
+      report,
+      "screenPageViews",
+    ),
+    averageEngagementTimeSeconds:
+      activeUsers > 0
+        ? roundNumber(
+            userEngagementDuration /
+              activeUsers,
+            1,
+          )
+        : 0,
+    eventCount: reportCount(
+      report,
+      "eventCount",
+    ),
+  };
+}
+
+function normalizeTopContent(report) {
+  const rows = Array.isArray(report?.rows)
+    ? report.rows
+    : [];
+
+  return rows
+    .slice(0, TOP_CONTENT_LIMIT)
+    .map((row) => {
+      const path = sanitizeAnalyticsText(
+        reportDimension(
+          report,
+          row,
+          "pagePath",
+        ),
+        512,
+      );
+      const title = sanitizeAnalyticsText(
+        reportDimension(
+          report,
+          row,
+          "pageTitle",
+        ),
+        240,
+      );
+
+      return {
+        title: title || path || "(not set)",
+        path,
+        views: reportCount(
+          report,
+          "screenPageViews",
+          row,
+        ),
+      };
+    });
+}
+
+function normalizeTrafficSources(
+  report,
+  totalSessions,
+) {
+  const rows = Array.isArray(report?.rows)
+    ? report.rows
+    : [];
+
+  return rows
+    .slice(0, TRAFFIC_SOURCE_LIMIT)
+    .map((row) => {
+      const sessions = reportCount(
+        report,
+        "sessions",
+        row,
+      );
+
+      return {
+        source:
+          sanitizeAnalyticsText(
+            reportDimension(
+              report,
+              row,
+              "sessionSource",
+            ),
+            160,
+          ) || "(not set)",
+        medium:
+          sanitizeAnalyticsText(
+            reportDimension(
+              report,
+              row,
+              "sessionMedium",
+            ),
+            120,
+          ) || "(not set)",
+        sessions,
+        users: reportCount(
+          report,
+          "totalUsers",
+          row,
+        ),
+        percentage:
+          totalSessions > 0
+            ? roundNumber(
+                (sessions /
+                  totalSessions) *
+                  100,
+                1,
+              )
+            : 0,
+      };
+    });
+}
+
+function reportCount(
+  report,
+  metricName,
+  row = undefined,
+) {
+  return Math.max(
+    0,
+    Math.round(
+      reportNumber(
+        report,
+        metricName,
+        row,
+      ),
+    ),
+  );
+}
+
+function reportNumber(
+  report,
+  metricName,
+  row = undefined,
+) {
+  const reportRow =
+    row ?? report?.rows?.[0];
+  const headers = Array.isArray(
+    report?.metricHeaders,
+  )
+    ? report.metricHeaders
+    : [];
+  const index = headers.findIndex(
+    (header) =>
+      header?.name === metricName,
+  );
+
+  if (
+    index < 0 ||
+    !Array.isArray(reportRow?.metricValues)
+  ) {
+    return 0;
+  }
+
+  const value = Number(
+    reportRow.metricValues[index]?.value,
+  );
+
+  return Number.isFinite(value) ? value : 0;
+}
+
+function reportDimension(
+  report,
+  row,
+  dimensionName,
+) {
+  const headers = Array.isArray(
+    report?.dimensionHeaders,
+  )
+    ? report.dimensionHeaders
+    : [];
+  const index = headers.findIndex(
+    (header) =>
+      header?.name === dimensionName,
+  );
+
+  if (
+    index < 0 ||
+    !Array.isArray(row?.dimensionValues)
+  ) {
+    return "";
+  }
+
+  return row.dimensionValues[index]?.value ?? "";
+}
+
+function sanitizeAnalyticsText(value, maxLength) {
+  return String(value ?? "")
+    .replace(/[\u0000-\u001f\u007f]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, maxLength);
+}
+
+function roundNumber(value, decimalPlaces) {
+  const factor = 10 ** decimalPlaces;
+  return Math.round(value * factor) / factor;
+}
+
+function isAnalyticsCacheEntry(
+  entry,
+  partName,
+) {
+  if (
+    !entry ||
+    typeof entry !== "object" ||
+    typeof entry.generatedAt !== "string" ||
+    !Number.isFinite(entry.expiresAt) ||
+    entry.expiresAt <= Date.now() ||
+    !entry.data ||
+    typeof entry.data !== "object"
+  ) {
+    return false;
+  }
+
+  if (partName === "realtime") {
+    return (
+      entry.data.realtime &&
+      typeof entry.data.realtime === "object"
+    );
+  }
+
+  return (
+    entry.data.today &&
+    entry.data.last7Days &&
+    entry.data.last30Days &&
+    Array.isArray(entry.data.topContent) &&
+    Array.isArray(
+      entry.data.trafficSources,
+    )
+  );
+}
+
+function getDefaultWorkerCache() {
+  try {
+    return typeof caches === "undefined"
+      ? null
+      : caches.default;
+  } catch {
+    return null;
+  }
+}
+
+function encodeBase64UrlJson(value) {
+  return encodeBase64UrlBytes(
+    new TextEncoder().encode(
+      JSON.stringify(value),
+    ),
+  );
+}
+
+function encodeBase64UrlBytes(bytes) {
+  let binary = "";
+
+  for (
+    let index = 0;
+    index < bytes.length;
+    index += 1
+  ) {
+    binary += String.fromCharCode(
+      bytes[index],
+    );
+  }
+
+  return btoa(binary)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+}
+
+function decodePem(pem) {
+  const encoded = pem
+    .replace(
+      /-----BEGIN PRIVATE KEY-----/g,
+      "",
+    )
+    .replace(
+      /-----END PRIVATE KEY-----/g,
+      "",
+    )
+    .replace(/\s/g, "");
+
+  const binary = atob(encoded);
+  const bytes = new Uint8Array(
+    binary.length,
+  );
+
+  for (
+    let index = 0;
+    index < binary.length;
+    index += 1
+  ) {
+    bytes[index] =
+      binary.charCodeAt(index);
+  }
+
+  return bytes.buffer;
+}
+
+function analyticsNotConfigured() {
+  return new HttpError(
+    503,
+    "analytics_not_configured",
+    "Analytics is not configured for this service.",
+  );
+}
+
+function analyticsAuthenticationFailed() {
+  return new HttpError(
+    502,
+    "analytics_authentication_failed",
+    "Analytics is temporarily unavailable.",
+  );
+}
+
+function analyticsUnavailable() {
+  return new HttpError(
+    502,
+    "analytics_unavailable",
+    "Analytics is temporarily unavailable.",
   );
 }
 

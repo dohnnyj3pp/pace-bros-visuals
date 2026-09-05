@@ -2,8 +2,8 @@
   --void: #0b0a0c;
   --panel: #121114;
   --panel-raised: #171619;
-  --foreground: #e8e4e5;
-  --muted: #979094;
+  --foreground: #ede9ea;
+  --muted: #aaa3a7;
   --border: #2d292d;
   --ember: #a33b31;
   --ember-bright: #bd4b40;
@@ -34,8 +34,9 @@ body {
   background: var(--void);
   color: var(--foreground);
   font-family: var(--font-body);
-  font-size: 0.9rem;
+  font-size: 0.94rem;
   line-height: 1.55;
+  letter-spacing: 0.004em;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -105,9 +106,9 @@ select:focus-visible {
   margin: 0 0 0.45rem;
   color: var(--muted);
   font-family: var(--font-display);
-  font-size: 0.68rem;
+  font-size: 0.72rem;
   font-weight: 500;
-  letter-spacing: 0.28em;
+  letter-spacing: 0.3em;
   text-transform: uppercase;
 }
 
@@ -117,8 +118,9 @@ select:focus-visible {
   gap: 0.75rem;
   width: fit-content;
   font-family: var(--font-display);
-  font-size: 0.75rem;
-  letter-spacing: 0.22em;
+  font-size: 0.8rem;
+  font-weight: 500;
+  letter-spacing: 0.23em;
   text-decoration: none;
   text-transform: uppercase;
 }
@@ -139,9 +141,9 @@ select:focus-visible {
   background: var(--foreground);
   color: var(--void);
   cursor: pointer;
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 600;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.045em;
   text-transform: uppercase;
 }
 
@@ -178,7 +180,7 @@ select:focus-visible {
   display: inline-block;
   margin-top: 1.5rem;
   color: var(--muted);
-  font-size: 0.75rem;
+  font-size: 0.79rem;
   text-underline-offset: 0.25rem;
 }
 
@@ -228,7 +230,7 @@ select:focus-visible {
   margin: 0;
   font-family: var(--font-display);
   font-size: clamp(2.2rem, 9vw, 3.6rem);
-  font-weight: 300;
+  font-weight: 400;
   line-height: 1;
   letter-spacing: 0.02em;
 }
@@ -282,7 +284,7 @@ select:focus-visible {
   min-height: 1.5rem;
   margin: 0;
   color: var(--muted);
-  font-size: 0.78rem;
+  font-size: 0.82rem;
 }
 
 .login-message.is-error {
@@ -329,7 +331,7 @@ select:focus-visible {
   align-items: center;
   gap: 0.55rem;
   color: var(--muted);
-  font-size: 0.72rem;
+  font-size: 0.76rem;
 }
 
 .status-dot {
@@ -357,7 +359,7 @@ select:focus-visible {
   background: transparent;
   color: var(--muted);
   cursor: pointer;
-  font-size: 0.68rem;
+  font-size: 0.72rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -394,9 +396,9 @@ select:focus-visible {
 .nav-group > p {
   margin: 0 0 0.35rem;
   padding: 0 0.65rem;
-  color: #706a6e;
+  color: #898287;
   font-family: var(--font-display);
-  font-size: 0.62rem;
+  font-size: 0.66rem;
   font-weight: 500;
   letter-spacing: 0.22em;
   text-transform: uppercase;
@@ -414,6 +416,9 @@ select:focus-visible {
   background: transparent;
   color: var(--muted);
   cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 400;
+  letter-spacing: 0.01em;
   text-align: left;
 }
 
@@ -429,8 +434,8 @@ select:focus-visible {
 }
 
 .nav-item span {
-  color: #625d61;
-  font-size: 0.55rem;
+  color: #7c757a;
+  font-size: 0.58rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -455,7 +460,7 @@ select:focus-visible {
   margin: 0;
   font-family: var(--font-display);
   font-size: clamp(2.7rem, 6vw, 4.25rem);
-  font-weight: 300;
+  font-weight: 400;
   line-height: 0.95;
   letter-spacing: 0.02em;
 }
@@ -479,7 +484,7 @@ select:focus-visible {
   margin: 0;
   font-family: var(--font-display);
   font-size: 1.75rem;
-  font-weight: 300;
+  font-weight: 400;
   line-height: 1.05;
   letter-spacing: 0.02em;
 }
@@ -490,7 +495,7 @@ select:focus-visible {
   border-left: 2px solid var(--border);
   background: var(--panel-raised);
   color: var(--muted);
-  font-size: 0.78rem;
+  font-size: 0.82rem;
 }
 
 .feedback:empty {
@@ -527,7 +532,7 @@ select:focus-visible {
   border-bottom: 1px solid var(--border);
   color: var(--muted);
   font-family: var(--font-display);
-  font-size: 0.66rem;
+  font-size: 0.7rem;
   font-weight: 500;
   letter-spacing: 0.16em;
   text-align: left;
@@ -572,7 +577,7 @@ select:focus-visible {
   align-items: center;
   gap: 0.4rem;
   color: var(--muted);
-  font-size: 0.7rem;
+  font-size: 0.74rem;
 }
 
 .status-badge::before {
@@ -605,7 +610,7 @@ select:focus-visible {
   background: transparent;
   color: var(--foreground);
   cursor: pointer;
-  font-size: 0.72rem;
+  font-size: 0.76rem;
   text-decoration: underline;
   text-decoration-color: #4b464a;
   text-underline-offset: 0.28rem;
@@ -686,7 +691,7 @@ textarea {
 .field small,
 .file-field small {
   color: var(--muted);
-  font-size: 0.7rem;
+  font-size: 0.74rem;
 }
 
 .field-row,
@@ -707,7 +712,7 @@ textarea {
 input[type="file"] {
   border: 0;
   color: var(--muted);
-  font-size: 0.72rem;
+  font-size: 0.76rem;
 }
 
 input[type="file"]::file-selector-button {
@@ -743,6 +748,212 @@ input[type="file"]::file-selector-button {
   color: var(--muted);
 }
 
+/* Protected Google Analytics workspace */
+.analytics-content {
+  display: grid;
+  gap: 1rem;
+}
+
+.analytics-state {
+  display: grid;
+  min-height: 12rem;
+  place-items: center;
+  color: var(--muted);
+  text-align: center;
+}
+
+.analytics-state.is-loading {
+  border-color: #403b3f;
+}
+
+.analytics-state.is-warning {
+  border-left: 2px solid var(--warning);
+}
+
+.analytics-state.is-error {
+  border-left: 2px solid var(--ember-bright);
+  color: #d99791;
+}
+
+.analytics-panel-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.analytics-updated,
+.analytics-period-label {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-align: right;
+  text-transform: uppercase;
+}
+
+.analytics-live-grid {
+  display: grid;
+  gap: 0;
+  margin-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.analytics-live-metric {
+  min-width: 0;
+  padding: 1.25rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.analytics-live-metric:last-child {
+  border-bottom: 0;
+}
+
+.analytics-metric-value {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(2.35rem, 6vw, 3.8rem);
+  font-weight: 400;
+  line-height: 0.95;
+  letter-spacing: 0.025em;
+  overflow-wrap: anywhere;
+}
+
+.analytics-live-metric.is-primary .analytics-metric-value {
+  color: #cf655b;
+}
+
+.analytics-metric-label {
+  margin: 0.55rem 0 0;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.analytics-period-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+  gap: 1rem;
+}
+
+.analytics-period-card h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.45rem;
+  font-weight: 400;
+  letter-spacing: 0.025em;
+}
+
+.analytics-period-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 1rem 0 0;
+  border-top: 1px solid var(--border);
+}
+
+.analytics-period-metric {
+  min-width: 0;
+  padding: 0.8rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.analytics-period-metric:nth-child(odd) {
+  padding-right: 0.7rem;
+}
+
+.analytics-period-metric:nth-child(even) {
+  padding-left: 0.7rem;
+  border-left: 1px solid var(--border);
+}
+
+.analytics-period-metric:nth-last-child(-n + 2) {
+  border-bottom: 0;
+}
+
+.analytics-period-metric dt {
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.analytics-period-metric dd {
+  margin: 0.28rem 0 0;
+  font-family: var(--font-display);
+  font-size: 1.45rem;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  overflow-wrap: anywhere;
+}
+
+.analytics-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 25rem), 1fr));
+  gap: 1rem;
+}
+
+.analytics-list {
+  margin: 1.15rem 0 0;
+  padding: 0;
+  border-top: 1px solid var(--border);
+  list-style: none;
+}
+
+.analytics-list-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.analytics-list-row:last-child {
+  border-bottom: 0;
+}
+
+.analytics-list-identity,
+.analytics-list-value {
+  display: grid;
+  min-width: 0;
+  gap: 0.16rem;
+}
+
+.analytics-list-identity strong,
+.analytics-list-value strong {
+  font-size: 0.84rem;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.analytics-list-identity span,
+.analytics-list-value span {
+  color: var(--muted);
+  font-size: 0.68rem;
+  overflow-wrap: anywhere;
+}
+
+.analytics-list-value {
+  justify-items: end;
+  text-align: right;
+}
+
+.analytics-list-value strong {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  letter-spacing: 0.025em;
+}
+
+.analytics-empty {
+  padding: 1.35rem 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
 .settings-panel {
   max-width: 44rem;
 }
@@ -776,6 +987,25 @@ input[type="file"]::file-selector-button {
   .field-row,
   .asset-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .analytics-live-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .analytics-live-metric {
+    padding: 1.35rem 1.25rem;
+    border-right: 1px solid var(--border);
+    border-bottom: 0;
+  }
+
+  .analytics-live-metric:first-child {
+    padding-left: 0;
+  }
+
+  .analytics-live-metric:last-child {
+    padding-right: 0;
+    border-right: 0;
   }
 }
 
@@ -835,6 +1065,16 @@ input[type="file"]::file-selector-button {
 
   .workspace-header .button {
     width: 100%;
+  }
+
+  .analytics-panel-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .analytics-updated,
+  .analytics-period-label {
+    text-align: left;
   }
 
   .film-table,

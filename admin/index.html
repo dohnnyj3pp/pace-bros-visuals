@@ -4,8 +4,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex, nofollow, noarchive" />
-    <meta name="description" content="Private film administration for Pace Bros Visuals." />
-    <title>Pace Bros Visuals — Film Administration</title>
+    <meta name="description" content="Private content and analytics administration for Pace Bros Visuals." />
+    <title>Pace Bros Visuals — Studio Administration</title>
     <link rel="icon" href="../assets/images/favicon.ico" sizes="any" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -13,7 +13,7 @@
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;500&family=Manrope:wght@300;400;500;600&display=swap"
     />
-    <link rel="stylesheet" href="css/admin.css" />
+    <link rel="stylesheet" href="css/admin.css?v=phase3" />
     <script
       src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.4"
       integrity="sha384-yiVMs0R/Jyz7OhoXa/DsEMUSBLjEhr/QJta2ONO+zB6I8/GmNg/7AUFrZmAJV7KV"
@@ -23,7 +23,8 @@
     <script src="../js/config.js" defer></script>
     <script src="../js/supabase-client.js" defer></script>
     <script src="../js/auth.js" defer></script>
-    <script src="js/admin.js" defer></script>
+    <script src="js/analytics.js?v=phase3" defer></script>
+    <script src="js/admin.js?v=phase3" defer></script>
     <script src="js/admin-guard.js" defer></script>
   </head>
   <body class="admin-page">
@@ -72,6 +73,10 @@
               <p>Publishing</p>
               <button class="nav-item" type="button" data-view="social-media">Social Media <span>Coming soon</span></button>
               <button class="nav-item" type="button" data-view="automation">Automation <span>Coming soon</span></button>
+            </div>
+            <div class="nav-group">
+              <p>Insights</p>
+              <button class="nav-item" type="button" data-view="analytics">Analytics</button>
             </div>
             <div class="nav-group">
               <p>System</p>
@@ -179,6 +184,67 @@
               <p id="placeholder-eyebrow" class="eyebrow">Content</p>
               <h1 id="placeholder-title">Clips</h1>
               <p id="placeholder-copy">Coming soon.</p>
+            </div>
+          </section>
+
+          <section id="analytics-view" class="workspace-view" data-workspace-view="analytics" hidden>
+            <header class="workspace-header analytics-header">
+              <div>
+                <p class="eyebrow">Insights</p>
+                <h1>Pace Bros Analytics</h1>
+              </div>
+              <button id="analytics-refresh" class="button button-secondary" type="button">Refresh</button>
+            </header>
+
+            <div
+              id="analytics-state"
+              class="panel analytics-state"
+              role="status"
+              aria-live="polite"
+            >
+              Open Analytics to load the latest studio activity.
+            </div>
+
+            <div id="analytics-content" class="analytics-content" hidden>
+              <section class="panel analytics-live-panel" aria-labelledby="analytics-live-heading">
+                <div class="analytics-panel-heading">
+                  <div>
+                    <p class="eyebrow">Live</p>
+                    <h2 id="analytics-live-heading">Last 30 minutes</h2>
+                  </div>
+                  <p id="analytics-updated" class="analytics-updated"></p>
+                </div>
+                <div id="analytics-live-metrics" class="analytics-live-grid"></div>
+              </section>
+
+              <section aria-labelledby="analytics-history-heading">
+                <h2 id="analytics-history-heading" class="visually-hidden">Historical analytics</h2>
+                <div id="analytics-periods" class="analytics-period-grid"></div>
+              </section>
+
+              <div class="analytics-detail-grid">
+                <section class="panel analytics-list-panel" aria-labelledby="analytics-content-heading">
+                  <div class="analytics-panel-heading">
+                    <div>
+                      <p class="eyebrow">Audience</p>
+                      <h2 id="analytics-content-heading">Top Content</h2>
+                    </div>
+                    <span class="analytics-period-label">Last 30 days</span>
+                  </div>
+                  <ol id="analytics-top-content" class="analytics-list"></ol>
+                </section>
+
+                <section class="panel analytics-list-panel" aria-labelledby="analytics-traffic-heading">
+                  <div class="analytics-panel-heading">
+                    <div>
+                      <p class="eyebrow">Acquisition</p>
+                      <h2 id="analytics-traffic-heading">Traffic Sources</h2>
+                    </div>
+                    <span class="analytics-period-label">Last 30 days</span>
+                  </div>
+                  <ol id="analytics-traffic-sources" class="analytics-list"></ol>
+                </section>
+              </div>
             </div>
           </section>
 

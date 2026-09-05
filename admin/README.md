@@ -1,4 +1,4 @@
-# Pace Bros Visuals film administration
+# Pace Bros Visuals studio administration
 
 The protected admin workspace is a vanilla HTML/CSS/JavaScript film CMS. It preserves the existing Supabase email/password login, persistent session, `admin_users` authorization check, and Logout flow.
 
@@ -15,6 +15,10 @@ Authorized administrators can:
 New poster and video files are sent directly to the Cloudflare Worker as raw request bodies. The browser includes the current Supabase access token and a generated film UUID. After both required uploads succeed, their returned R2 object keys are saved in the Supabase film row. Publishing is blocked until both a poster key and video key exist.
 
 The production-pass request limit is 95 MB per file. MP4 is accepted for video; JPEG, PNG, and WebP are accepted for posters.
+
+## Analytics workspace
+
+The permanent **Insights → Analytics** view requests `GET /admin/analytics` from the configured Worker only when an administrator opens it or selects **Refresh**. The request carries the current Supabase access token as a Bearer token; the Worker remains responsible for validating the session and `admin_users` membership before contacting Google Analytics. The client consumes the Worker's normalized realtime, historical, top-content, and traffic-source response without mock values or aggressive polling. Loading, unconfigured, authorization, and temporary API failures stay contained inside the Analytics view so the Films workflow remains usable. No Google property ID, OAuth secret, service-account credential, or private Google configuration belongs in Admin HTML or JavaScript.
 
 ## Browser-safe configuration
 

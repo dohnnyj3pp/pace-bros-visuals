@@ -17,6 +17,8 @@
     "SUPABASE_URL": "https://dlpxhhhcrgttbpdqbxno.supabase.co",
     "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_dQGqDdeAbpzBLa6BLiP_Jw_QXbhOUR-",
     "ALLOWED_ORIGINS": "https://dohnnyj3pp.github.io,https://pacebrosvisuals.ca,https://www.pacebrosvisuals.ca",
-    "MAX_UPLOAD_BYTES": "95000000"
+    "MAX_UPLOAD_BYTES": "95000000",
+    "ANALYTICS_REALTIME_CACHE_SECONDS": "60",
+    "ANALYTICS_HISTORICAL_CACHE_SECONDS": "300"
   }
 }
