@@ -42,7 +42,7 @@ const UUID_PATTERN =
 const FILM_ID_PATTERN = new RegExp(`^${UUID_PATTERN}$`, "i");
 
 const MEDIA_KEY_PATTERN = new RegExp(
-  `^films/${UUID_PATTERN}/(?:video/${UUID_PATTERN}\\.mp4|poster/${UUID_PATTERN}\\.(?:jpg|png|webp))$`,
+  `^films/${UUID_PATTERN}/(?:video/${UUID_PATTERN}\\.mp4|poster/${UUID_PATTERN}\\.(?:jpg|png|webp)|clips/${UUID_PATTERN}\\.mp4)$`,
   "i",
 );
 
@@ -70,6 +70,16 @@ const UPLOAD_TYPES = new Map([
         ["image/jpg", { extension: "jpg", contentType: "image/jpeg" }],
         ["image/png", { extension: "png", contentType: "image/png" }],
         ["image/webp", { extension: "webp", contentType: "image/webp" }],
+      ]),
+    },
+  ],
+  [
+    "/upload/clip",
+    {
+      kind: "clip",
+      pathSegment: "clips",
+      mimeTypes: new Map([
+        ["video/mp4", { extension: "mp4", contentType: "video/mp4" }],
       ]),
     },
   ],
@@ -474,9 +484,9 @@ async function handleUpload(request, env, uploadType) {
 
   if (!mediaType) {
     const expected =
-      uploadType.kind === "video"
-        ? "an MP4 video"
-        : "a JPG, PNG, or WebP image";
+      uploadType.kind === "poster"
+        ? "a JPG, PNG, or WebP image"
+        : "an MP4 video";
 
     throw new HttpError(
       415,
@@ -512,9 +522,11 @@ async function handleUpload(request, env, uploadType) {
   }
 
   const objectId = crypto.randomUUID();
+  const pathSegment =
+    uploadType.pathSegment ?? uploadType.kind;
 
   const objectKey =
-    `films/${filmId}/${uploadType.kind}/` +
+    `films/${filmId}/${pathSegment}/` +
     `${objectId}.${mediaType.extension}`;
 
   const storedObject = await env.MEDIA_BUCKET.put(

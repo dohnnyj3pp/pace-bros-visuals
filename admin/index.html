@@ -13,7 +13,7 @@
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;500&family=Manrope:wght@300;400;500;600&display=swap"
     />
-    <link rel="stylesheet" href="css/admin.css?v=phase3" />
+    <link rel="stylesheet" href="css/admin.css?v=phase3-clips" />
     <script
       src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.4"
       integrity="sha384-yiVMs0R/Jyz7OhoXa/DsEMUSBLjEhr/QJta2ONO+zB6I8/GmNg/7AUFrZmAJV7KV"
@@ -24,7 +24,8 @@
     <script src="../js/supabase-client.js" defer></script>
     <script src="../js/auth.js" defer></script>
     <script src="js/analytics.js?v=phase3" defer></script>
-    <script src="js/admin.js?v=phase3" defer></script>
+    <script src="js/clips.js?v=phase3-clips" defer></script>
+    <script src="js/admin.js?v=phase3-clips" defer></script>
     <script src="js/admin-guard.js" defer></script>
   </head>
   <body class="admin-page">
@@ -67,7 +68,7 @@
             <div class="nav-group">
               <p>Content</p>
               <button class="nav-item is-active" type="button" data-view="films">Films</button>
-              <button class="nav-item" type="button" data-view="clips">Clips <span>Coming soon</span></button>
+              <button class="nav-item" type="button" data-view="clips">Clips</button>
             </div>
             <div class="nav-group">
               <p>Publishing</p>
@@ -174,6 +175,125 @@
                   <button id="cancel-edit-button" class="button button-secondary" type="button">Cancel</button>
                   <button id="save-draft-button" class="button button-secondary" type="submit" data-publish="false">Save Draft</button>
                   <button id="publish-film-button" class="button button-publish" type="submit" data-publish="true">Publish Film</button>
+                </div>
+              </form>
+            </section>
+          </section>
+
+          <section id="clips-view" class="workspace-view" data-workspace-view="clips" hidden>
+            <header class="workspace-header">
+              <div>
+                <p class="eyebrow">Content</p>
+                <h1>Clips</h1>
+                <p class="workspace-intro">Promotional Content Library</p>
+              </div>
+              <button id="add-clip-button" class="button button-publish" type="button">+ Add Clip</button>
+            </header>
+
+            <p id="clips-feedback" class="feedback" role="status" aria-live="polite"></p>
+
+            <section class="panel library-panel" aria-labelledby="clips-library-heading">
+              <h2 id="clips-library-heading" class="visually-hidden">Promotional clips</h2>
+              <div class="clip-table-wrap">
+                <table class="clip-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Clip</th>
+                      <th scope="col">Parent Film</th>
+                      <th scope="col">Duration</th>
+                      <th scope="col">Aspect</th>
+                      <th scope="col">Captions</th>
+                      <th scope="col">Status</th>
+                      <th scope="col">Created</th>
+                      <th scope="col">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="clip-table-body"></tbody>
+                </table>
+              </div>
+              <div id="clips-library-state" class="library-state">Open Clips to load the library.</div>
+            </section>
+
+            <section id="clip-editor" class="panel editor-panel clip-editor-panel" aria-labelledby="clip-editor-heading" hidden>
+              <div class="panel-heading">
+                <div>
+                  <p id="clip-editor-eyebrow" class="eyebrow">New clip</p>
+                  <h2 id="clip-editor-heading">Add Clip</h2>
+                </div>
+                <button id="close-clip-editor" class="text-button" type="button">Close</button>
+              </div>
+
+              <form id="clip-form" novalidate>
+                <input id="clip-id" name="id" type="hidden" />
+                <input id="clip-video-key" name="video_key" type="hidden" />
+
+                <div class="field-row">
+                  <label class="field" for="clip-film-id">
+                    <span>Parent Film</span>
+                    <select id="clip-film-id" name="film_id" required>
+                      <option value="">Choose a film</option>
+                    </select>
+                    <small id="clip-film-help">The film that owns this promotional clip.</small>
+                  </label>
+
+                  <label class="field" for="clip-name">
+                    <span>Clip Name</span>
+                    <input id="clip-name" name="name" type="text" maxlength="160" autocomplete="off" required />
+                    <small>An internal descriptive name, such as Vent POV.</small>
+                  </label>
+                </div>
+
+                <label id="clip-video-field" class="file-field clip-video-field" for="clip-video-file">
+                  <span>Clip MP4</span>
+                  <input id="clip-video-file" name="video" type="file" accept="video/mp4" required />
+                  <small id="clip-video-summary">Choose the finished MP4 clip.</small>
+                </label>
+
+                <dl id="clip-media-metadata" class="clip-media-metadata" hidden>
+                  <div><dt>Duration</dt><dd id="clip-metadata-duration">—</dd></div>
+                  <div><dt>Dimensions</dt><dd id="clip-metadata-dimensions">—</dd></div>
+                  <div><dt>Aspect Ratio</dt><dd id="clip-metadata-aspect">—</dd></div>
+                </dl>
+
+                <label class="field" for="clip-notes">
+                  <span>Internal Notes</span>
+                  <textarea id="clip-notes" name="notes" rows="4" maxlength="2400" placeholder="Context for the studio and future content systems."></textarea>
+                </label>
+
+                <div class="field-row">
+                  <label class="field" for="clip-status">
+                    <span>Status</span>
+                    <select id="clip-status" name="status">
+                      <option value="active">Active</option>
+                      <option value="archived">Archived</option>
+                    </select>
+                    <small>Archived clips stay stored but out of the active inventory.</small>
+                  </label>
+
+                  <label class="field" for="clip-tags">
+                    <span>Internal Tags</span>
+                    <input id="clip-tags" name="tags" type="text" maxlength="1000" autocomplete="off" placeholder="horror, suspense, hook" />
+                    <small>Comma-separated keywords. These are not social hashtags.</small>
+                  </label>
+                </div>
+
+                <section class="caption-bank" aria-labelledby="caption-bank-heading">
+                  <div class="caption-bank-heading">
+                    <div>
+                      <p class="eyebrow">Reusable Copy</p>
+                      <h3 id="caption-bank-heading">Caption Bank</h3>
+                    </div>
+                    <button id="add-caption-button" class="button button-secondary" type="button">+ Add Caption</button>
+                  </div>
+                  <div id="caption-fields" class="caption-fields"></div>
+                  <p id="caption-empty" class="caption-empty">No captions yet. Add as many platform-agnostic variants as you need.</p>
+                </section>
+
+                <p id="clip-form-feedback" class="feedback" role="status" aria-live="polite"></p>
+
+                <div class="form-actions">
+                  <button id="cancel-clip-edit" class="button button-secondary" type="button">Cancel</button>
+                  <button id="save-clip-button" class="button button-publish" type="submit">Save Clip</button>
                 </div>
               </form>
             </section>

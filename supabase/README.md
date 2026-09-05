@@ -1,4 +1,4 @@
-# Supabase Phase 2 setup
+# Supabase setup
 
 The repository migration creates `public.films`, its `updated_at` trigger, the public-catalogue
 index, grants, Row Level Security, and the two required access policies.
@@ -15,3 +15,13 @@ Apply it once before using the Film Library:
 The migration assumes the existing `public.admin_users(user_id)` table and its self-read policy
 from Phase 1 are already present. Do not add a `service_role` key or another secret to the static
 site or Worker.
+
+## Clips Library migration
+
+Apply `migrations/202609050001_create_clips_library.sql` once after the films migration. It creates
+the admin-only `public.clips` and `public.clip_captions` tables, indexes, timestamp triggers, and
+Row Level Security policies. Its restrictive film foreign key prevents a parent film from being
+deleted while promotional clips still belong to it.
+
+The migration is intentionally not run automatically by this static-site repository. Paste its
+complete contents into the Supabase SQL Editor and run it once before using **Admin → Clips**.

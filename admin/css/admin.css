@@ -465,6 +465,13 @@ select:focus-visible {
   letter-spacing: 0.02em;
 }
 
+.workspace-intro {
+  margin: 0.65rem 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  letter-spacing: 0.025em;
+}
+
 .panel {
   padding: clamp(1.1rem, 3vw, 1.8rem);
   border: 1px solid var(--border);
@@ -592,8 +599,17 @@ select:focus-visible {
   color: var(--success);
 }
 
-.status-badge.is-published::before {
+.status-badge.is-published::before,
+.status-badge.is-active::before {
   background: var(--success);
+}
+
+.status-badge.is-active {
+  color: var(--success);
+}
+
+.status-badge.is-archived {
+  color: var(--muted);
 }
 
 .film-actions {
@@ -640,6 +656,12 @@ select:focus-visible {
 }
 
 #film-form {
+  display: grid;
+  gap: 1.2rem;
+  margin-top: 1.6rem;
+}
+
+#clip-form {
   display: grid;
   gap: 1.2rem;
   margin-top: 1.6rem;
@@ -723,6 +745,188 @@ input[type="file"]::file-selector-button {
   background: var(--void);
   color: var(--foreground);
   cursor: pointer;
+}
+
+/* Promotional Clips Library */
+.clip-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.clip-table {
+  width: 100%;
+  min-width: 68rem;
+  border-collapse: collapse;
+}
+
+.clip-table th {
+  padding: 0 0.65rem 0.8rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.13em;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.clip-table td {
+  padding: 1rem 0.65rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+  vertical-align: middle;
+}
+
+.clip-table th:first-child,
+.clip-table td:first-child {
+  min-width: 10rem;
+  padding-left: 0;
+}
+
+.clip-table th:nth-child(2),
+.clip-table td:nth-child(2) {
+  min-width: 9rem;
+}
+
+.clip-table th:last-child,
+.clip-table td:last-child {
+  min-width: 11rem;
+  padding-right: 0;
+  text-align: right;
+}
+
+.clip-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.clip-table strong {
+  color: var(--foreground);
+  font-size: 0.86rem;
+  font-weight: 500;
+}
+
+.clip-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.7rem;
+}
+
+.clip-editor-panel {
+  max-width: 68rem;
+}
+
+.clip-video-field {
+  min-height: 7.25rem;
+}
+
+.clip-media-metadata {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 0.35rem;
+  background: var(--panel-raised);
+}
+
+.clip-media-metadata > div {
+  min-width: 0;
+  padding: 0.85rem 1rem;
+  border-right: 1px solid var(--border);
+}
+
+.clip-media-metadata > div:last-child {
+  border-right: 0;
+}
+
+.clip-media-metadata dt {
+  color: var(--muted);
+  font-family: var(--font-display);
+  font-size: 0.66rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.clip-media-metadata dd {
+  margin: 0.28rem 0 0;
+  font-size: 0.84rem;
+  overflow-wrap: anywhere;
+}
+
+.caption-bank {
+  padding-top: 1.3rem;
+  border-top: 1px solid var(--border);
+}
+
+.caption-bank-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.caption-bank-heading h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+}
+
+.caption-fields {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.caption-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.85rem;
+  align-items: end;
+  padding: 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 0.35rem;
+  background: var(--panel-raised);
+}
+
+.caption-field label {
+  display: grid;
+  min-width: 0;
+  gap: 0.42rem;
+}
+
+.caption-label {
+  color: var(--foreground);
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.caption-field textarea {
+  min-height: 4.3rem;
+}
+
+.caption-actions {
+  display: grid;
+  justify-items: start;
+  gap: 0.35rem;
+  padding-bottom: 0.25rem;
+  white-space: nowrap;
+}
+
+.caption-empty {
+  margin: 1rem 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
 }
 
 .form-actions {
@@ -1111,6 +1315,95 @@ input[type="file"]::file-selector-button {
 
   .form-actions .button {
     flex: 1 1 100%;
+  }
+
+  .caption-bank-heading,
+  .caption-field {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+  }
+
+  .caption-bank-heading {
+    flex-direction: column;
+  }
+
+  .caption-bank-heading .button {
+    width: 100%;
+  }
+
+  .caption-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.85rem;
+  }
+
+  .clip-media-metadata {
+    grid-template-columns: 1fr;
+  }
+
+  .clip-media-metadata > div {
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .clip-media-metadata > div:last-child {
+    border-bottom: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .clip-table-wrap {
+    overflow-x: visible;
+  }
+
+  .clip-table,
+  .clip-table tbody,
+  .clip-table tr,
+  .clip-table td {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .clip-table {
+    min-width: 0;
+  }
+
+  .clip-table thead {
+    display: none;
+  }
+
+  .clip-table tr {
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .clip-table tbody tr:last-child {
+    border-bottom: 0;
+  }
+
+  .clip-table td,
+  .clip-table td:last-child {
+    display: grid;
+    grid-template-columns: minmax(6.5rem, 0.34fr) minmax(0, 1fr);
+    gap: 0.8rem;
+    padding: 0.25rem 0;
+    border: 0;
+    text-align: left;
+  }
+
+  .clip-table td::before {
+    color: var(--muted);
+    content: attr(data-label);
+    font-family: var(--font-display);
+    font-size: 0.66rem;
+    font-weight: 500;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+  }
+
+  .clip-actions {
+    justify-content: flex-start;
   }
 }
 

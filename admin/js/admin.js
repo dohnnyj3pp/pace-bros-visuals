@@ -50,6 +50,7 @@
         document.querySelectorAll("[data-workspace-view]"),
       ),
       filmsView: document.querySelector("#films-view"),
+      clipsView: document.querySelector("#clips-view"),
       analyticsView: document.querySelector("#analytics-view"),
       placeholderView: document.querySelector("#placeholder-view"),
       settingsView: document.querySelector("#settings-view"),
@@ -149,6 +150,12 @@
         workerBaseUrl,
       }) || { ensureLoaded() {} };
 
+    const clipsController =
+      global.PaceAdminClips?.createController({
+        client,
+        workerBaseUrl,
+      }) || { ensureLoaded() {} };
+
     function getFilm(filmId) {
       return (
         state.films.find(
@@ -201,18 +208,19 @@
 
     function showView(viewName) {
       const isPlaceholder = [
-        "clips",
         "social-media",
         "automation",
       ].includes(viewName);
 
       const targetView = isPlaceholder
         ? elements.placeholderView
-        : viewName === "analytics"
-          ? elements.analyticsView
-          : viewName === "settings"
-            ? elements.settingsView
-            : elements.filmsView;
+        : viewName === "clips"
+          ? elements.clipsView
+          : viewName === "analytics"
+            ? elements.analyticsView
+            : viewName === "settings"
+              ? elements.settingsView
+              : elements.filmsView;
 
       elements.views.forEach((view) => {
         view.hidden = view !== targetView;
@@ -238,13 +246,14 @@
         return;
       }
 
+      if (viewName === "clips") {
+        clipsController.ensureLoaded();
+        return;
+      }
+
       if (!isPlaceholder) return;
 
       const placeholders = {
-        clips: [
-          "Content",
-          "Clips",
-        ],
         "social-media": [
           "Publishing",
           "Social Media",

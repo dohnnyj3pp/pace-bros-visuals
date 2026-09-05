@@ -9,6 +9,7 @@ not need or accept R2 S3 access keys.
 
 - `POST /upload/video` — authenticated administrator MP4 upload.
 - `POST /upload/poster` — authenticated administrator JPG, PNG, or WebP upload.
+- `POST /upload/clip` — authenticated administrator promotional-clip MP4 upload.
 - `POST /upload/video/multipart/create` — authenticated multipart video start.
 - `PUT /upload/video/multipart/part` — authenticated multipart video part upload.
 - `POST /upload/video/multipart/complete` — authenticated multipart video completion.
@@ -41,6 +42,10 @@ A successful upload returns HTTP `201`:
   "etag": "..."
 }
 ```
+
+Clip uploads use the same headers and response contract, with keys shaped as
+`films/<film-uuid>/clips/<random-uuid>.mp4`. They intentionally use the normal bounded upload
+route; the existing master-film multipart routes remain unchanged.
 
 Errors return `{ "error": { "code": "...", "message": "..." } }`. Delete is idempotent and
 returns HTTP `204` after authorization.
