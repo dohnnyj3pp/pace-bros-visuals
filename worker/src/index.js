@@ -1,5 +1,9 @@
 const MEDIA_ROUTE_PREFIX = "/media/";
 const ADMIN_ANALYTICS_ROUTE = "/admin/analytics";
+const SOCIAL_CONNECTIONS_ROUTE = "/admin/social/connections";
+const META_CONNECT_ROUTE = "/admin/social/meta/connect";
+const META_COMPLETE_ROUTE = "/admin/social/meta/complete";
+const META_SELECT_ROUTE = "/admin/social/meta/select";
 const DEFAULT_ALLOWED_ORIGIN = "https://pacebrosvisuals.ca";
 const DEFAULT_MAX_UPLOAD_BYTES = 95_000_000;
 const DEFAULT_REALTIME_CACHE_SECONDS = 60;
@@ -14,6 +18,39 @@ const ANALYTICS_CACHE_ORIGIN =
   "https://pace-bros-analytics-cache.internal";
 const TOP_CONTENT_LIMIT = 8;
 const TRAFFIC_SOURCE_LIMIT = 8;
+const DEFAULT_META_GRAPH_API_VERSION = "v26.0";
+const DEFAULT_META_REDIRECT_URI =
+  "https://pacebrosvisuals.ca/admin/";
+const DEFAULT_META_REQUIRED_SCOPES = [
+  "pages_show_list",
+  "pages_read_engagement",
+  "business_management",
+];
+const META_INSTAGRAM_DISCOVERY_SCOPE = "instagram_basic";
+const DEFAULT_META_STATE_TTL_SECONDS = 600;
+const META_GRAPH_ORIGIN = "https://graph.facebook.com";
+const META_DIALOG_ORIGIN = "https://www.facebook.com";
+const META_SELECTION_PURPOSE = "meta-page-selection";
+const META_STATE_PURPOSE = "meta-oauth";
+const META_SELECTION_AAD = "pace-bros:meta-page-selection:v1";
+const MAX_SOCIAL_REQUEST_BYTES = 128_000;
+const MAX_META_PAGES = 100;
+const SOCIAL_CONNECTION_COLUMNS = [
+  "id",
+  "provider",
+  "platform",
+  "external_account_id",
+  "display_name",
+  "username",
+  "token_expires_at",
+  "scopes",
+  "status",
+  "metadata",
+  "created_by",
+  "connected_at",
+  "created_at",
+  "updated_at",
+].join(",");
 
 let googleAccessTokenCache = null;
 let googleAccessTokenInFlight = null;
@@ -153,6 +190,16 @@ async function routeRequest(
       env,
       executionContext,
     );
+  }
+
+  const socialResponse = await routeSocialAdminRequest(
+    request,
+    env,
+    url,
+  );
+
+  if (socialResponse) {
+    return socialResponse;
   }
 
   if (url.pathname === "/upload/video/multipart/create") {
@@ -683,6 +730,1463 @@ async function serveMedia(request, env, objectKey) {
       headers,
     },
   );
+}
+
+async function routeSocialAdminRequest(request, env, url) {
+  if (url.pathname === META_CONNECT_ROUTE) {
+    assertRequestMethod(request, "POST", "POST, OPTIONS");
+    return handleMetaConnect(request, env);
+  }
+
+  if (url.pathname === META_COMPLETE_ROUTE) {
+    assertRequestMethod(request, "POST", "POST, OPTIONS");
+    return handleMetaComplete(request, env);
+  }
+
+  if (url.pathname === META_SELECT_ROUTE) {
+    assertRequestMethod(request, "POST", "POST, OPTIONS");
+    return handleMetaPageSelection(request, env);
+  }
+
+  if (url.pathname === SOCIAL_CONNECTIONS_ROUTE) {
+    assertRequestMethod(request, "GET", "GET, OPTIONS");
+    return handleSocialConnectionsList(request, env);
+  }
+
+  const connectionPrefix = `${SOCIAL_CONNECTIONS_ROUTE}/`;
+
+  if (url.pathname.startsWith(connectionPrefix)) {
+    assertRequestMethod(request, "DELETE", "DELETE, OPTIONS");
+    const connectionId = url.pathname.slice(connectionPrefix.length);
+
+    if (!FILM_ID_PATTERN.test(connectionId)) {
+      throw new HttpError(
+        400,
+        "invalid_social_connection_id",
+        "The social connection ID is invalid.",
+      );
+    }
+
+    return handleSocialConnectionDelete(
+      request,
+      env,
+      connectionId.toLowerCase(),
+    );
+  }
+
+  return null;
+}
+
+function assertRequestMethod(request, method, allow) {
+  if (request.method === method) return;
+
+  throw new HttpError(
+    405,
+    "method_not_allowed",
+    "This social account route does not accept that method.",
+    { Allow: allow },
+  );
+}
+
+async function handleMetaConnect(request, env) {
+  assertAdminRequestOrigin(request, env);
+  const { userId } = await authorizeAdmin(request, env);
+  const configuration = readMetaConfiguration(env);
+  const body = await readSocialJsonBody(request, { optional: true });
+  const replaceConnectionId = readOptionalConnectionId(
+    body.connectionId,
+  );
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const state = await createMetaOAuthState(
+    {
+      version: 1,
+      purpose: META_STATE_PURPOSE,
+      subject: userId,
+      nonce: encodeBase64UrlBytes(
+        crypto.getRandomValues(new Uint8Array(24)),
+      ),
+      issuedAt,
+      expiresAt:
+        issuedAt + configuration.stateTtlSeconds,
+      replaceConnectionId,
+    },
+    configuration.stateSecret,
+  );
+
+  const authorizationUrl = new URL(
+    `/${configuration.graphApiVersion}/dialog/oauth`,
+    META_DIALOG_ORIGIN,
+  );
+  authorizationUrl.searchParams.set("client_id", configuration.appId);
+  authorizationUrl.searchParams.set("redirect_uri", configuration.redirectUri);
+  authorizationUrl.searchParams.set("config_id", configuration.loginConfigId);
+  authorizationUrl.searchParams.set("response_type", "code");
+  authorizationUrl.searchParams.set("override_default_response_type", "true");
+  authorizationUrl.searchParams.set("auth_type", "rerequest");
+  authorizationUrl.searchParams.set("state", state);
+
+  return jsonResponse(
+    {
+      authorizationUrl: authorizationUrl.href,
+      expiresIn: configuration.stateTtlSeconds,
+    },
+    {
+      headers: { "Cache-Control": "private, no-store" },
+    },
+  );
+}
+
+async function handleMetaComplete(request, env) {
+  assertAdminRequestOrigin(request, env);
+  const { userId, accessToken } = await authorizeAdmin(request, env);
+  const configuration = readMetaConfiguration(env);
+  const body = await readSocialJsonBody(request);
+  const code = readBoundedString(body.code, "authorization code", 4096);
+  const state = readBoundedString(body.state, "OAuth state", 8192);
+  const statePayload = await verifyMetaOAuthState(
+    state,
+    configuration,
+    userId,
+  );
+  const authorization = await completeMetaAuthorization(
+    code,
+    configuration,
+  );
+
+  if (authorization.pages.length === 1) {
+    const connection = await createAndPersistMetaConnection({
+      page: authorization.pages[0],
+      authorization,
+      configuration,
+      supabaseAccessToken: accessToken,
+      userId,
+      replaceConnectionId: statePayload.replaceConnectionId,
+      env,
+    });
+
+    return jsonResponse(
+      { connection },
+      { headers: { "Cache-Control": "private, no-store" } },
+    );
+  }
+
+  const selectionToken = await createMetaSelectionToken(
+    {
+      version: 1,
+      purpose: META_SELECTION_PURPOSE,
+      subject: userId,
+      expiresAt:
+        Math.floor(Date.now() / 1000) +
+        configuration.stateTtlSeconds,
+      replaceConnectionId: statePayload.replaceConnectionId,
+      tokenExpiresAt: authorization.tokenExpiresAt,
+      scopes: authorization.scopes,
+      pages: authorization.pages,
+    },
+    configuration.encryptionKey,
+  );
+
+  return jsonResponse(
+    {
+      selectionRequired: true,
+      selectionToken,
+      pages: authorization.pages.map(sanitizeMetaPageOption),
+    },
+    { headers: { "Cache-Control": "private, no-store" } },
+  );
+}
+
+async function handleMetaPageSelection(request, env) {
+  assertAdminRequestOrigin(request, env);
+  const { userId, accessToken } = await authorizeAdmin(request, env);
+  const configuration = readMetaConfiguration(env);
+  const body = await readSocialJsonBody(request);
+  const selectionToken = readBoundedString(
+    body.selectionToken,
+    "Page selection token",
+    120_000,
+  );
+  const pageId = readMetaObjectId(body.pageId, "Facebook Page ID");
+  const selection = await readMetaSelectionToken(
+    selectionToken,
+    configuration.encryptionKey,
+    userId,
+  );
+  const page = selection.pages.find((candidate) => candidate.id === pageId);
+
+  if (!page) {
+    throw new HttpError(
+      400,
+      "invalid_meta_page_selection",
+      "Select one of the Facebook Pages returned by this connection attempt.",
+    );
+  }
+
+  const connection = await createAndPersistMetaConnection({
+    page,
+    authorization: {
+      tokenExpiresAt: selection.tokenExpiresAt,
+      scopes: selection.scopes,
+    },
+    configuration,
+    supabaseAccessToken: accessToken,
+    userId,
+    replaceConnectionId: selection.replaceConnectionId,
+    env,
+  });
+
+  return jsonResponse(
+    { connection },
+    { headers: { "Cache-Control": "private, no-store" } },
+  );
+}
+
+async function handleSocialConnectionsList(request, env) {
+  assertAdminRequestOrigin(request, env);
+  const { accessToken } = await authorizeAdmin(request, env);
+  const rows = await listSocialConnectionRows(env, accessToken);
+
+  return jsonResponse(
+    { connections: rows.map(sanitizeSocialConnection) },
+    { headers: { "Cache-Control": "private, no-store" } },
+  );
+}
+
+async function handleSocialConnectionDelete(
+  request,
+  env,
+  connectionId,
+) {
+  assertAdminRequestOrigin(request, env);
+  const { accessToken } = await authorizeAdmin(request, env);
+  const deleted = await deleteSocialConnectionRow(
+    env,
+    accessToken,
+    connectionId,
+  );
+
+  if (!deleted) {
+    throw new HttpError(
+      404,
+      "social_connection_not_found",
+      "That social connection no longer exists.",
+    );
+  }
+
+  return jsonResponse(
+    { disconnected: true, id: connectionId },
+    { headers: { "Cache-Control": "private, no-store" } },
+  );
+}
+
+function readMetaConfiguration(env) {
+  const appId = String(env.META_APP_ID ?? "").trim();
+  const appSecret = String(env.META_APP_SECRET ?? "").trim();
+  const loginConfigId = String(env.META_LOGIN_CONFIG_ID ?? "").trim();
+  const stateSecret = String(env.META_OAUTH_STATE_SECRET ?? "").trim();
+  const encryptionKey = String(
+    env.META_TOKEN_ENCRYPTION_KEY ?? "",
+  ).trim();
+  const graphApiVersion = String(
+    env.META_GRAPH_API_VERSION ?? DEFAULT_META_GRAPH_API_VERSION,
+  ).trim();
+  const redirectUri = String(
+    env.META_REDIRECT_URI ?? DEFAULT_META_REDIRECT_URI,
+  ).trim();
+  const stateTtlSeconds = Number(
+    env.META_OAUTH_STATE_TTL_SECONDS ??
+      DEFAULT_META_STATE_TTL_SECONDS,
+  );
+
+  let parsedRedirectUri;
+
+  try {
+    parsedRedirectUri = new URL(redirectUri);
+  } catch {
+    throw metaNotConfigured();
+  }
+
+  const stateSecretBytes = new TextEncoder().encode(stateSecret);
+  const encryptionKeyBytes = decodeBase64Secret(encryptionKey);
+
+  if (
+    !/^\d{5,32}$/.test(appId) ||
+    !/^\d{5,32}$/.test(loginConfigId) ||
+    appSecret.length < 8 ||
+    stateSecretBytes.byteLength < 32 ||
+    encryptionKeyBytes?.byteLength !== 32 ||
+    !/^v\d+\.\d+$/.test(graphApiVersion) ||
+    parsedRedirectUri.protocol !== "https:" ||
+    parsedRedirectUri.search ||
+    parsedRedirectUri.hash ||
+    !getAllowedOrigins(env).has(parsedRedirectUri.origin) ||
+    !Number.isSafeInteger(stateTtlSeconds) ||
+    stateTtlSeconds < 300 ||
+    stateTtlSeconds > 1800
+  ) {
+    throw metaNotConfigured();
+  }
+
+  return {
+    appId,
+    appSecret,
+    loginConfigId,
+    stateSecret,
+    encryptionKey,
+    graphApiVersion,
+    redirectUri: parsedRedirectUri.href,
+    stateTtlSeconds,
+    requiredScopes: readMetaRequiredScopes(env),
+  };
+}
+
+function readMetaRequiredScopes(env) {
+  const configured = String(env.META_REQUIRED_SCOPES ?? "")
+    .split(",")
+    .map((scope) => scope.trim())
+    .filter(Boolean);
+  const scopes = configured.length
+    ? configured
+    : DEFAULT_META_REQUIRED_SCOPES;
+
+  if (
+    scopes.length > 20 ||
+    scopes.some((scope) => !/^[a-z][a-z0-9_]{1,80}$/.test(scope))
+  ) {
+    throw metaNotConfigured();
+  }
+
+  return Array.from(new Set(scopes));
+}
+
+function metaNotConfigured() {
+  return new HttpError(
+    503,
+    "meta_not_configured",
+    "Meta account connection is not configured for this service.",
+  );
+}
+
+async function completeMetaAuthorization(code, configuration) {
+  const shortLived = await requestMetaToken(
+    configuration,
+    {
+      client_id: configuration.appId,
+      client_secret: configuration.appSecret,
+      redirect_uri: configuration.redirectUri,
+      code,
+    },
+    "authorization_code_exchange",
+  );
+  const shortToken = readMetaAccessToken(shortLived);
+  const longLived = await requestMetaToken(
+    configuration,
+    {
+      grant_type: "fb_exchange_token",
+      client_id: configuration.appId,
+      client_secret: configuration.appSecret,
+      fb_exchange_token: shortToken,
+    },
+    "long_lived_token_exchange",
+  );
+  const userAccessToken = readMetaAccessToken(longLived);
+  const tokenExpiresAt = expiryFromSeconds(
+    longLived.expires_in ?? shortLived.expires_in,
+  );
+  const scopes = await getGrantedMetaScopes(
+    configuration,
+    userAccessToken,
+  );
+  const missingScopes = configuration.requiredScopes.filter(
+    (scope) => !scopes.includes(scope),
+  );
+
+  if (missingScopes.length) {
+    throw new HttpError(
+      422,
+      "meta_permissions_missing",
+      `Meta did not grant these required permissions: ${missingScopes.join(", ")}. Reconnect and approve the complete permission set.`,
+    );
+  }
+
+  const pages = await discoverManagedMetaPages(
+    configuration,
+    userAccessToken,
+    scopes,
+  );
+
+  return {
+    userAccessToken,
+    tokenExpiresAt,
+    scopes,
+    pages,
+  };
+}
+
+async function requestMetaToken(
+  configuration,
+  parameters,
+  operation,
+) {
+  const url = new URL(
+    `/${configuration.graphApiVersion}/oauth/access_token`,
+    META_GRAPH_ORIGIN,
+  );
+  let response;
+
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+      },
+      body: new URLSearchParams(parameters),
+    });
+  } catch {
+    throw new HttpError(
+      502,
+      "meta_token_exchange_failed",
+      "Meta could not complete the authorization exchange. Try connecting again.",
+    );
+  }
+
+  const payload = await parseMetaResponse(response);
+
+  if (!response.ok || payload?.error || !payload?.access_token) {
+    console.warn("Meta OAuth exchange failed", {
+      operation,
+      httpStatus: response.status,
+      metaCode: readMetaErrorCode(payload),
+    });
+
+    throw new HttpError(
+      502,
+      "meta_token_exchange_failed",
+      "Meta could not complete the authorization exchange. Try connecting again.",
+    );
+  }
+
+  return payload;
+}
+
+function readMetaAccessToken(payload) {
+  const token = typeof payload?.access_token === "string"
+    ? payload.access_token.trim()
+    : "";
+
+  if (!token || token.length > 16_384) {
+    throw new HttpError(
+      502,
+      "meta_token_exchange_failed",
+      "Meta returned an unusable authorization response. Try connecting again.",
+    );
+  }
+
+  return token;
+}
+
+function expiryFromSeconds(value) {
+  const seconds = Number(value);
+
+  if (
+    !Number.isFinite(seconds) ||
+    seconds <= 0 ||
+    seconds > 366 * 24 * 60 * 60
+  ) {
+    return null;
+  }
+
+  return new Date(Date.now() + Math.floor(seconds) * 1000).toISOString();
+}
+
+async function getGrantedMetaScopes(configuration, accessToken) {
+  const payload = await requestMetaGraph(
+    configuration,
+    "me/permissions",
+    accessToken,
+    { limit: "100" },
+    "permissions",
+  );
+
+  return Array.from(
+    new Set(
+      (Array.isArray(payload?.data) ? payload.data : [])
+        .filter((entry) => entry?.status === "granted")
+        .map((entry) => String(entry?.permission ?? "").trim())
+        .filter((scope) => /^[a-z][a-z0-9_]{1,80}$/.test(scope)),
+    ),
+  ).sort();
+}
+
+async function discoverManagedMetaPages(
+  configuration,
+  userAccessToken,
+  scopes,
+) {
+  const canDiscoverInstagram = scopes.includes(
+    META_INSTAGRAM_DISCOVERY_SCOPE,
+  );
+  const fields = canDiscoverInstagram
+    ? "id,name,access_token,tasks,instagram_business_account"
+    : "id,name,access_token,tasks";
+  const payload = await requestMetaGraph(
+    configuration,
+    "me/accounts",
+    userAccessToken,
+    {
+      fields,
+      limit: String(MAX_META_PAGES),
+    },
+    "page_discovery",
+  );
+  const candidates = Array.isArray(payload?.data) ? payload.data : [];
+  const pages = candidates
+    .slice(0, MAX_META_PAGES)
+    .map(normalizeManagedMetaPage)
+    .filter(Boolean);
+
+  if (!pages.length) {
+    throw new HttpError(
+      422,
+      "meta_no_managed_pages",
+      "Meta did not return a manageable Facebook Page. Confirm the Facebook identity has Page access and reconnect.",
+    );
+  }
+
+  return pages;
+}
+
+function normalizeManagedMetaPage(page) {
+  const id = normalizeMetaObjectId(page?.id);
+  const name = sanitizeSocialText(page?.name, 240);
+  const pageAccessToken = typeof page?.access_token === "string"
+    ? page.access_token.trim()
+    : "";
+  const instagramAccountId = normalizeMetaObjectId(
+    page?.instagram_business_account?.id,
+  );
+
+  if (!id || !name || !pageAccessToken || pageAccessToken.length > 16_384) {
+    return null;
+  }
+
+  return {
+    id,
+    name,
+    pageAccessToken,
+    tasks: Array.from(
+      new Set(
+        (Array.isArray(page?.tasks) ? page.tasks : [])
+          .map((task) => sanitizeSocialText(task, 100))
+          .filter(Boolean),
+      ),
+    ).slice(0, 32),
+    instagramAccountId,
+  };
+}
+
+async function requestMetaGraph(
+  configuration,
+  path,
+  accessToken,
+  parameters,
+  operation,
+) {
+  const url = new URL(
+    `/${configuration.graphApiVersion}/${path}`,
+    META_GRAPH_ORIGIN,
+  );
+
+  for (const [name, value] of Object.entries(parameters ?? {})) {
+    url.searchParams.set(name, value);
+  }
+
+  url.searchParams.set(
+    "appsecret_proof",
+    await createMetaAppSecretProof(
+      accessToken,
+      configuration.appSecret,
+    ),
+  );
+
+  let response;
+
+  try {
+    response = await fetch(url, {
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+  } catch {
+    throw new HttpError(
+      502,
+      "meta_api_unavailable",
+      "Meta account information is temporarily unavailable.",
+    );
+  }
+
+  const payload = await parseMetaResponse(response);
+
+  if (!response.ok || payload?.error) {
+    console.warn("Meta Graph request failed", {
+      operation,
+      httpStatus: response.status,
+      metaCode: readMetaErrorCode(payload),
+    });
+
+    throw new HttpError(
+      502,
+      "meta_api_unavailable",
+      "Meta account information is temporarily unavailable.",
+    );
+  }
+
+  return payload;
+}
+
+async function createMetaAppSecretProof(accessToken, appSecret) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(appSecret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const signature = new Uint8Array(
+    await crypto.subtle.sign(
+      "HMAC",
+      key,
+      new TextEncoder().encode(accessToken),
+    ),
+  );
+
+  return Array.from(signature, (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
+}
+
+async function parseMetaResponse(response) {
+  const text = await response.text();
+
+  if (!text) return null;
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    const parameters = new URLSearchParams(text);
+    return Object.fromEntries(parameters.entries());
+  }
+}
+
+function readMetaErrorCode(payload) {
+  const value = payload?.error?.code ?? payload?.error_code ?? "unknown";
+  return sanitizeSocialText(value, 40) || "unknown";
+}
+
+async function createAndPersistMetaConnection({
+  page,
+  authorization,
+  configuration,
+  supabaseAccessToken,
+  userId,
+  replaceConnectionId,
+  env,
+}) {
+  const instagramDiscovery = await discoverLinkedInstagramAccount(
+    page,
+    configuration,
+    authorization.scopes,
+  );
+  const connectedAt = new Date().toISOString();
+  const encryptedCredentials = await encryptMetaPayload(
+    {
+      version: 1,
+      provider: "meta",
+      graphApiVersion: configuration.graphApiVersion,
+      facebookPageAccessToken: page.pageAccessToken,
+      facebookPageId: page.id,
+      instagramAccountId: instagramDiscovery.account?.id ?? null,
+      scopes: authorization.scopes,
+      tokenExpiresAt: authorization.tokenExpiresAt,
+      storedAt: connectedAt,
+    },
+    configuration.encryptionKey,
+    metaCredentialsAad(page.id),
+  );
+  const row = {
+    provider: "meta",
+    platform: "facebook",
+    external_account_id: page.id,
+    display_name: page.name,
+    username: null,
+    encrypted_credentials: encryptedCredentials,
+    token_expires_at: authorization.tokenExpiresAt,
+    scopes: authorization.scopes,
+    status: "connected",
+    metadata: {
+      graphApiVersion: configuration.graphApiVersion,
+      facebook: {
+        id: page.id,
+        name: page.name,
+        tasks: page.tasks,
+      },
+      instagram: instagramDiscovery.account,
+      instagramDiscovery: instagramDiscovery.status,
+    },
+    created_by: userId,
+    connected_at: connectedAt,
+  };
+  const saved = await persistSocialConnectionRow(
+    env,
+    supabaseAccessToken,
+    row,
+  );
+
+  if (replaceConnectionId && replaceConnectionId !== saved.id) {
+    const removed = await deleteSocialConnectionRow(
+      env,
+      supabaseAccessToken,
+      replaceConnectionId,
+    );
+
+    if (!removed) {
+      console.warn("Meta reconnect left the prior connection unchanged", {
+        replacementStatus: "not_found",
+      });
+    }
+  }
+
+  return sanitizeSocialConnection(saved);
+}
+
+async function discoverLinkedInstagramAccount(
+  page,
+  configuration,
+  scopes,
+) {
+  if (!scopes.includes(META_INSTAGRAM_DISCOVERY_SCOPE)) {
+    return { account: null, status: "unavailable" };
+  }
+
+  if (!page.instagramAccountId) {
+    return { account: null, status: "not_linked" };
+  }
+
+  try {
+    const payload = await requestMetaGraph(
+      configuration,
+      page.instagramAccountId,
+      page.pageAccessToken,
+      { fields: "id,username,name" },
+      "instagram_discovery",
+    );
+    const id = normalizeMetaObjectId(payload?.id) ?? page.instagramAccountId;
+    const username = sanitizeSocialText(payload?.username, 160) || null;
+    const name = sanitizeSocialText(payload?.name, 240) || null;
+
+    return {
+      account: { id, username, name },
+      status: "connected",
+    };
+  } catch (error) {
+    if (!(error instanceof HttpError)) throw error;
+
+    return {
+      account: {
+        id: page.instagramAccountId,
+        username: null,
+        name: null,
+      },
+      status: "unavailable",
+    };
+  }
+}
+
+function sanitizeMetaPageOption(page) {
+  return {
+    id: page.id,
+    name: page.name,
+    instagram: page.instagramAccountId
+      ? { id: page.instagramAccountId }
+      : null,
+  };
+}
+
+function sanitizeSocialConnection(row) {
+  const metadata = isPlainObject(row?.metadata) ? row.metadata : {};
+  const facebook = isPlainObject(metadata.facebook)
+    ? metadata.facebook
+    : {};
+  const instagram = isPlainObject(metadata.instagram)
+    ? metadata.instagram
+    : null;
+  const expiresAt = normalizeIsoTimestamp(row?.token_expires_at);
+  const storedStatus = row?.status === "reconnect_required"
+    ? "reconnect_required"
+    : "connected";
+  const status = expiresAt && Date.parse(expiresAt) <= Date.now()
+    ? "reconnect_required"
+    : storedStatus;
+  const externalAccountId = sanitizeSocialText(
+    row?.external_account_id,
+    128,
+  );
+  const displayName = sanitizeSocialText(row?.display_name, 240);
+
+  return {
+    id: String(row?.id ?? ""),
+    provider: sanitizeSocialText(row?.provider, 64),
+    platform: sanitizeSocialText(row?.platform, 64),
+    externalAccountId,
+    displayName,
+    username: sanitizeSocialText(row?.username, 160) || null,
+    status,
+    tokenExpiresAt: expiresAt,
+    scopes: normalizeScopeList(row?.scopes),
+    connectedAt: normalizeIsoTimestamp(row?.connected_at),
+    createdAt: normalizeIsoTimestamp(row?.created_at),
+    updatedAt: normalizeIsoTimestamp(row?.updated_at),
+    facebook: {
+      id: normalizeMetaObjectId(facebook.id) ?? externalAccountId,
+      name: sanitizeSocialText(facebook.name, 240) || displayName,
+    },
+    instagram: instagram
+      ? {
+          id: normalizeMetaObjectId(instagram.id),
+          username: sanitizeSocialText(instagram.username, 160) || null,
+          name: sanitizeSocialText(instagram.name, 240) || null,
+        }
+      : null,
+    instagramDiscovery:
+      ["connected", "not_linked", "unavailable"].includes(
+        metadata.instagramDiscovery,
+      )
+        ? metadata.instagramDiscovery
+        : instagram
+          ? "connected"
+          : "not_linked",
+  };
+}
+
+async function listSocialConnectionRows(env, accessToken) {
+  const url = socialConnectionsRestUrl(env);
+  url.searchParams.set("select", SOCIAL_CONNECTION_COLUMNS);
+  url.searchParams.set("order", "connected_at.desc,id.asc");
+  const response = await fetchSocialStorage(
+    url,
+    env,
+    accessToken,
+    { method: "GET" },
+  );
+  const rows = await parseJson(response);
+
+  if (!response.ok || !Array.isArray(rows)) {
+    throw socialStorageUnavailable(response.status);
+  }
+
+  return rows;
+}
+
+async function persistSocialConnectionRow(env, accessToken, row) {
+  const url = socialConnectionsRestUrl(env);
+  url.searchParams.set(
+    "on_conflict",
+    "provider,platform,external_account_id",
+  );
+  url.searchParams.set("select", SOCIAL_CONNECTION_COLUMNS);
+  const response = await fetchSocialStorage(
+    url,
+    env,
+    accessToken,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Prefer: "resolution=merge-duplicates,return=representation",
+      },
+      body: JSON.stringify(row),
+    },
+  );
+  const rows = await parseJson(response);
+
+  if (!response.ok || !Array.isArray(rows) || !rows[0]?.id) {
+    throw socialStorageUnavailable(response.status);
+  }
+
+  return rows[0];
+}
+
+async function deleteSocialConnectionRow(env, accessToken, connectionId) {
+  const url = socialConnectionsRestUrl(env);
+  url.searchParams.set("id", `eq.${connectionId}`);
+  url.searchParams.set("select", "id");
+  const response = await fetchSocialStorage(
+    url,
+    env,
+    accessToken,
+    {
+      method: "DELETE",
+      headers: { Prefer: "return=representation" },
+    },
+  );
+  const rows = await parseJson(response);
+
+  if (!response.ok || !Array.isArray(rows)) {
+    throw socialStorageUnavailable(response.status);
+  }
+
+  return rows.some((row) => row?.id === connectionId);
+}
+
+function socialConnectionsRestUrl(env) {
+  return new URL(
+    "/rest/v1/social_connections",
+    readSupabaseUrl(env),
+  );
+}
+
+async function fetchSocialStorage(
+  url,
+  env,
+  accessToken,
+  init,
+) {
+  const publishableKey = String(
+    env.SUPABASE_PUBLISHABLE_KEY ?? "",
+  ).trim();
+
+  if (!publishableKey) {
+    throw new HttpError(
+      500,
+      "worker_not_configured",
+      "The media service is missing its Supabase configuration.",
+    );
+  }
+
+  const headers = new Headers(init.headers);
+  headers.set("Accept", "application/json");
+  headers.set("apikey", publishableKey);
+  headers.set("Authorization", `Bearer ${accessToken}`);
+
+  try {
+    return await fetch(url, { ...init, headers });
+  } catch {
+    throw socialStorageUnavailable(0);
+  }
+}
+
+function socialStorageUnavailable(httpStatus) {
+  console.warn("Social connection storage request failed", { httpStatus });
+
+  return new HttpError(
+    502,
+    "social_storage_unavailable",
+    "Social connections are temporarily unavailable. Confirm the social connections migration has been applied.",
+  );
+}
+
+async function readSocialJsonBody(request, { optional = false } = {}) {
+  const contentType = normalizeContentType(
+    request.headers.get("Content-Type"),
+  );
+
+  if (contentType && contentType !== "application/json") {
+    throw new HttpError(
+      415,
+      "invalid_social_request",
+      "Social account requests must use application/json.",
+    );
+  }
+
+  const declaredLength = request.headers.get("Content-Length");
+
+  if (declaredLength && /^\d+$/.test(declaredLength)) {
+    const byteLength = Number(declaredLength);
+
+    if (
+      !Number.isSafeInteger(byteLength) ||
+      byteLength > MAX_SOCIAL_REQUEST_BYTES
+    ) {
+      throw new HttpError(
+        413,
+        "social_request_too_large",
+        "The social account request is too large.",
+      );
+    }
+  }
+
+  const text = await request.text();
+
+  if (!text.trim()) {
+    if (optional) return {};
+
+    throw new HttpError(
+      400,
+      "invalid_social_request",
+      "A JSON request body is required.",
+    );
+  }
+
+  if (new TextEncoder().encode(text).byteLength > MAX_SOCIAL_REQUEST_BYTES) {
+    throw new HttpError(
+      413,
+      "social_request_too_large",
+      "The social account request is too large.",
+    );
+  }
+
+  let body;
+
+  try {
+    body = JSON.parse(text);
+  } catch {
+    throw new HttpError(
+      400,
+      "invalid_social_request",
+      "The social account request contains invalid JSON.",
+    );
+  }
+
+  if (!isPlainObject(body)) {
+    throw new HttpError(
+      400,
+      "invalid_social_request",
+      "The social account request must be a JSON object.",
+    );
+  }
+
+  return body;
+}
+
+function readOptionalConnectionId(value) {
+  if (value === undefined || value === null || value === "") return null;
+
+  const connectionId = String(value).trim().toLowerCase();
+
+  if (!FILM_ID_PATTERN.test(connectionId)) {
+    throw new HttpError(
+      400,
+      "invalid_social_connection_id",
+      "The social connection ID is invalid.",
+    );
+  }
+
+  return connectionId;
+}
+
+function readBoundedString(value, label, maxLength) {
+  const normalized = typeof value === "string" ? value.trim() : "";
+
+  if (!normalized || normalized.length > maxLength) {
+    throw new HttpError(
+      400,
+      "invalid_social_request",
+      `The ${label} is missing or invalid.`,
+    );
+  }
+
+  return normalized;
+}
+
+function readMetaObjectId(value, label) {
+  const id = normalizeMetaObjectId(value);
+
+  if (!id) {
+    throw new HttpError(
+      400,
+      "invalid_meta_page_selection",
+      `The ${label} is invalid.`,
+    );
+  }
+
+  return id;
+}
+
+function normalizeMetaObjectId(value) {
+  const id = String(value ?? "").trim();
+  return /^\d{1,64}$/.test(id) ? id : null;
+}
+
+function sanitizeSocialText(value, maxLength) {
+  return String(value ?? "")
+    .replace(/[\u0000-\u001f\u007f]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, maxLength);
+}
+
+function normalizeScopeList(scopes) {
+  return Array.from(
+    new Set(
+      (Array.isArray(scopes) ? scopes : [])
+        .map((scope) => sanitizeSocialText(scope, 82))
+        .filter((scope) => /^[a-z][a-z0-9_]{1,80}$/.test(scope)),
+    ),
+  ).sort();
+}
+
+function normalizeIsoTimestamp(value) {
+  if (typeof value !== "string" || value.length > 64) return null;
+
+  const milliseconds = Date.parse(value);
+  return Number.isFinite(milliseconds)
+    ? new Date(milliseconds).toISOString()
+    : null;
+}
+
+function isPlainObject(value) {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      !Array.isArray(value),
+  );
+}
+
+async function createMetaOAuthState(payload, secret) {
+  const encodedPayload = encodeBase64UrlJson(payload);
+  const signature = await signMetaState(encodedPayload, secret);
+  return `${encodedPayload}.${encodeBase64UrlBytes(signature)}`;
+}
+
+async function verifyMetaOAuthState(
+  state,
+  configuration,
+  userId,
+) {
+  const parts = state.split(".");
+
+  if (parts.length !== 2 || parts.some((part) => !part)) {
+    throw invalidMetaState();
+  }
+
+  let suppliedSignature;
+
+  try {
+    suppliedSignature = decodeBase64UrlBytes(parts[1], 64);
+  } catch {
+    throw invalidMetaState();
+  }
+
+  if (suppliedSignature.byteLength !== 32) throw invalidMetaState();
+
+  const key = await importMetaStateKey(
+    configuration.stateSecret,
+    ["verify"],
+  );
+  const verified = await crypto.subtle.verify(
+    "HMAC",
+    key,
+    suppliedSignature,
+    new TextEncoder().encode(parts[0]),
+  );
+
+  if (!verified) throw invalidMetaState();
+
+  let payload;
+
+  try {
+    payload = decodeBase64UrlJson(parts[0], 4096);
+  } catch {
+    throw invalidMetaState();
+  }
+
+  if (
+    !isPlainObject(payload) ||
+    payload.version !== 1 ||
+    payload.purpose !== META_STATE_PURPOSE ||
+    !FILM_ID_PATTERN.test(String(payload.subject ?? "")) ||
+    typeof payload.nonce !== "string" ||
+    !/^[A-Za-z0-9_-]{24,80}$/.test(payload.nonce) ||
+    !Number.isSafeInteger(payload.issuedAt) ||
+    !Number.isSafeInteger(payload.expiresAt) ||
+    payload.expiresAt - payload.issuedAt !==
+      configuration.stateTtlSeconds ||
+    payload.issuedAt > Math.floor(Date.now() / 1000) + 60
+  ) {
+    throw invalidMetaState();
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+
+  if (payload.expiresAt <= now) {
+    throw new HttpError(
+      400,
+      "meta_oauth_state_expired",
+      "The Meta connection attempt expired. Start again from Social Media.",
+    );
+  }
+
+  if (payload.subject !== userId) {
+    throw new HttpError(
+      403,
+      "meta_oauth_state_mismatch",
+      "This Meta connection attempt belongs to a different administrator session.",
+    );
+  }
+
+  return {
+    replaceConnectionId: readOptionalConnectionId(
+      payload.replaceConnectionId,
+    ),
+  };
+}
+
+function invalidMetaState() {
+  return new HttpError(
+    400,
+    "invalid_meta_oauth_state",
+    "The Meta connection state is invalid. Start again from Social Media.",
+  );
+}
+
+async function signMetaState(encodedPayload, secret) {
+  const key = await importMetaStateKey(secret, ["sign"]);
+  return new Uint8Array(
+    await crypto.subtle.sign(
+      "HMAC",
+      key,
+      new TextEncoder().encode(encodedPayload),
+    ),
+  );
+}
+
+async function importMetaStateKey(secret, usages) {
+  return crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    usages,
+  );
+}
+
+async function createMetaSelectionToken(payload, encryptionKey) {
+  const envelope = await encryptMetaPayload(
+    payload,
+    encryptionKey,
+    META_SELECTION_AAD,
+  );
+  return encodeBase64UrlJson(envelope);
+}
+
+async function readMetaSelectionToken(token, encryptionKey, userId) {
+  let envelope;
+  let payload;
+
+  try {
+    envelope = decodeBase64UrlJson(token, MAX_SOCIAL_REQUEST_BYTES);
+    payload = await decryptMetaPayload(
+      envelope,
+      encryptionKey,
+      META_SELECTION_AAD,
+    );
+  } catch {
+    throw invalidMetaSelectionToken();
+  }
+
+  if (
+    !isPlainObject(payload) ||
+    payload.version !== 1 ||
+    payload.purpose !== META_SELECTION_PURPOSE ||
+    payload.subject !== userId ||
+    !Number.isSafeInteger(payload.expiresAt)
+  ) {
+    throw invalidMetaSelectionToken();
+  }
+
+  if (payload.expiresAt <= Math.floor(Date.now() / 1000)) {
+    throw new HttpError(
+      400,
+      "meta_page_selection_expired",
+      "The Facebook Page selection expired. Start the Meta connection again.",
+    );
+  }
+
+  const pages = (Array.isArray(payload.pages) ? payload.pages : [])
+    .slice(0, MAX_META_PAGES)
+    .map(normalizeSelectionPage)
+    .filter(Boolean);
+
+  if (
+    !pages.length
+  ) {
+    throw invalidMetaSelectionToken();
+  }
+
+  return {
+    tokenExpiresAt: normalizeIsoTimestamp(payload.tokenExpiresAt),
+    scopes: normalizeScopeList(payload.scopes),
+    pages,
+    replaceConnectionId: readOptionalConnectionId(
+      payload.replaceConnectionId,
+    ),
+  };
+}
+
+function normalizeSelectionPage(page) {
+  if (!isPlainObject(page)) return null;
+
+  const id = normalizeMetaObjectId(page.id);
+  const name = sanitizeSocialText(page.name, 240);
+  const pageAccessToken = typeof page.pageAccessToken === "string"
+    ? page.pageAccessToken.trim()
+    : "";
+
+  if (!id || !name || !pageAccessToken || pageAccessToken.length > 16_384) {
+    return null;
+  }
+
+  return {
+    id,
+    name,
+    pageAccessToken,
+    tasks: Array.from(
+      new Set(
+        (Array.isArray(page.tasks) ? page.tasks : [])
+          .map((task) => sanitizeSocialText(task, 100))
+          .filter(Boolean),
+      ),
+    ).slice(0, 32),
+    instagramAccountId: normalizeMetaObjectId(page.instagramAccountId),
+  };
+}
+
+function invalidMetaSelectionToken() {
+  return new HttpError(
+    400,
+    "invalid_meta_page_selection",
+    "The Facebook Page selection is invalid. Start the Meta connection again.",
+  );
+}
+
+async function encryptMetaPayload(value, encodedKey, additionalData) {
+  const key = await importMetaEncryptionKey(encodedKey, ["encrypt"]);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const plaintext = new TextEncoder().encode(JSON.stringify(value));
+  const ciphertext = new Uint8Array(
+    await crypto.subtle.encrypt(
+      {
+        name: "AES-GCM",
+        iv,
+        additionalData: new TextEncoder().encode(additionalData),
+        tagLength: 128,
+      },
+      key,
+      plaintext,
+    ),
+  );
+
+  return {
+    version: 1,
+    algorithm: "A256GCM",
+    iv: encodeBase64UrlBytes(iv),
+    ciphertext: encodeBase64UrlBytes(ciphertext),
+  };
+}
+
+async function decryptMetaPayload(envelope, encodedKey, additionalData) {
+  if (
+    !isPlainObject(envelope) ||
+    envelope.version !== 1 ||
+    envelope.algorithm !== "A256GCM" ||
+    typeof envelope.iv !== "string" ||
+    typeof envelope.ciphertext !== "string"
+  ) {
+    throw new Error("Invalid encrypted envelope");
+  }
+
+  const iv = decodeBase64UrlBytes(envelope.iv, 32);
+  const ciphertext = decodeBase64UrlBytes(
+    envelope.ciphertext,
+    MAX_SOCIAL_REQUEST_BYTES,
+  );
+
+  if (iv.byteLength !== 12 || ciphertext.byteLength < 17) {
+    throw new Error("Invalid encrypted envelope");
+  }
+
+  const key = await importMetaEncryptionKey(encodedKey, ["decrypt"]);
+  const plaintext = await crypto.subtle.decrypt(
+    {
+      name: "AES-GCM",
+      iv,
+      additionalData: new TextEncoder().encode(additionalData),
+      tagLength: 128,
+    },
+    key,
+    ciphertext,
+  );
+  return JSON.parse(new TextDecoder().decode(plaintext));
+}
+
+async function importMetaEncryptionKey(encodedKey, usages) {
+  const keyBytes = decodeBase64Secret(encodedKey);
+
+  if (!keyBytes || keyBytes.byteLength !== 32) throw new Error("Invalid key");
+
+  return crypto.subtle.importKey(
+    "raw",
+    keyBytes,
+    { name: "AES-GCM", length: 256 },
+    false,
+    usages,
+  );
+}
+
+function metaCredentialsAad(pageId) {
+  return `pace-bros:meta-credentials:${pageId}:v1`;
+}
+
+function decodeBase64Secret(value) {
+  const input = String(value ?? "").trim();
+
+  if (!input || input.length > 256) return null;
+
+  const normalized = input.replace(/-/g, "+").replace(/_/g, "/");
+
+  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(normalized)) return null;
+
+  const padded = normalized.padEnd(
+    normalized.length + ((4 - (normalized.length % 4)) % 4),
+    "=",
+  );
+
+  try {
+    const binary = atob(padded);
+    return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+  } catch {
+    return null;
+  }
+}
+
+function decodeBase64UrlBytes(value, maxBytes) {
+  const input = String(value ?? "");
+
+  if (
+    !input ||
+    !/^[A-Za-z0-9_-]+$/.test(input) ||
+    input.length > Math.ceil(maxBytes * 4 / 3) + 4
+  ) {
+    throw new Error("Invalid base64url value");
+  }
+
+  const normalized = input.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized.padEnd(
+    normalized.length + ((4 - (normalized.length % 4)) % 4),
+    "=",
+  );
+  const binary = atob(padded);
+
+  if (binary.length > maxBytes) throw new Error("Base64url value is too large");
+
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+}
+
+function decodeBase64UrlJson(value, maxBytes) {
+  const bytes = decodeBase64UrlBytes(value, maxBytes);
+  return JSON.parse(new TextDecoder().decode(bytes));
 }
 
 async function handleAdminAnalytics(
@@ -1854,7 +3358,10 @@ async function authorizeAdmin(request, env) {
     );
   }
 
-  return { userId: user.id };
+  return {
+    userId: user.id,
+    accessToken: token,
+  };
 }
 
 function readFilmId(request) {

@@ -1,9 +1,9 @@
-# Pace Bros media and analytics Worker
+# Pace Bros media, analytics, and social Worker
 
 This Worker is the authenticated upload bridge and public media streamer for the private
 `pace-bros-media` R2 bucket. It also provides the protected Admin analytics API backed by the
-official Google Analytics Data API v1beta. It uses the direct `MEDIA_BUCKET` R2 binding; it does
-not need or accept R2 S3 access keys.
+official Google Analytics Data API v1beta and the server-side Meta account-connection boundary.
+It uses the direct `MEDIA_BUCKET` R2 binding; it does not need or accept R2 S3 access keys.
 
 ## Routes
 
@@ -18,6 +18,11 @@ not need or accept R2 S3 access keys.
 - `HEAD /media/<object-key>` — public media metadata.
 - `DELETE /media/<object-key>` — authenticated administrator cleanup.
 - `GET /admin/analytics` — authenticated, normalized GA4 realtime and historical analytics.
+- `POST /admin/social/meta/connect` — creates a signed Facebook Login for Business authorization URL.
+- `POST /admin/social/meta/complete` — validates state, exchanges the code, and discovers Pages.
+- `POST /admin/social/meta/select` — completes a multiple-Page selection using an encrypted token.
+- `GET /admin/social/connections` — returns sanitized connection metadata only.
+- `DELETE /admin/social/connections/<connection-uuid>` — removes locally stored credentials.
 - `OPTIONS` — restricted CORS preflight.
 
 Full and ranged GET bodies pass through Cloudflare's `FixedLengthStream`, so the runtime emits an
@@ -52,7 +57,7 @@ returns HTTP `204` after authorization.
 
 ## Authorization boundary
 
-For every upload, delete, multipart operation, or analytics request, the Worker:
+For every upload, delete, multipart, analytics, or social-account request, the Worker:
 
 1. validates the Bearer token with the configured Supabase `/auth/v1/user` endpoint;
 2. queries `public.admin_users` with that same token and the browser-safe publishable key;
@@ -64,6 +69,8 @@ must continue to let an authenticated administrator select their own authorizati
 
 Authorization happens before the analytics cache is read, so cached analytics can never bypass
 the administrator boundary. Analytics responses sent to the browser use `private, no-store`.
+Social responses are also `private, no-store`; access tokens, ciphertext, app secrets, signing
+secrets, and encryption keys are never returned.
 
 ## Admin analytics contract
 
@@ -156,6 +163,88 @@ Failures retain the standard Worker error shape:
 Analytics-specific codes are `analytics_not_configured`, `analytics_authentication_failed`, and
 `analytics_unavailable`. They intentionally contain no Google credential, property, or upstream
 response details.
+
+## Meta account connection
+
+The Social Media workspace uses Facebook Login for Business with an authorization-code flow.
+The Worker creates a ten-minute HMAC-signed state bound to the current Supabase administrator.
+After Meta redirects to `https://pacebrosvisuals.ca/admin/`, Admin immediately removes the OAuth
+parameters from the visible URL and submits the code and state to the Worker with its Supabase
+Bearer token. The Worker exchanges the code and short-lived user token server-side, verifies the
+granted permissions, discovers managed Pages, and looks up a linked Instagram Professional
+account for the selected Page.
+
+If Meta returns multiple Pages, the Worker returns names and IDs plus a short-lived opaque Page
+selection token. Page access tokens remain inside its AES-256-GCM ciphertext and are never
+exposed as plaintext to browser JavaScript. Only the selected Page token is encrypted again with
+a fresh nonce before the connection is stored in Supabase; the broader user token is not retained.
+
+The normalized browser response contains only connection IDs, Facebook/Instagram identity,
+status, granted scopes, and timestamps. Disconnect deletes the local row and encrypted token
+material. Full Meta app deauthorization is intentionally deferred because it would revoke the
+whole Meta grant rather than only the selected Page.
+
+### Meta developer setup
+
+1. Create a **Business** app in Meta for Developers and add **Facebook Login for Business**.
+2. Create a Facebook Login for Business configuration that returns a **User access token**. Add:
+   `pages_show_list`, `pages_read_engagement`, `instagram_basic`, and `business_management`.
+   `public_profile` is implicit. The Worker requires the three Page/business permissions;
+   `instagram_basic` enables optional linked-account discovery and does not block Facebook when
+   unavailable. Do not add publishing permissions for this connection-only phase.
+3. Register this exact Valid OAuth Redirect URI, including the trailing slash:
+
+   ```text
+   https://pacebrosvisuals.ca/admin/
+   ```
+
+4. Add `pacebrosvisuals.ca` as the app domain/site where Meta requests it. Copy the Meta **App
+   ID**, **App Secret**, and the Facebook Login for Business **Configuration ID**.
+5. While the app is in Development Mode, add the Facebook identity used by Pace Bros as an app
+   Administrator, Developer, or Tester. That identity must also have access to the Pace Bros
+   Visuals Facebook Page. To discover Instagram, link a Business or Creator Instagram account to
+   that Page.
+
+The committed Worker variables pin Graph API `v26.0`, the production redirect URI, the required
+permission set, and a 600-second state lifetime. Store all account-specific values through
+Wrangler so none enter Git history:
+
+```powershell
+npx wrangler secret put META_APP_ID
+npx wrangler secret put META_LOGIN_CONFIG_ID
+npx wrangler secret put META_APP_SECRET
+npx wrangler secret put META_OAUTH_STATE_SECRET
+npx wrangler secret put META_TOKEN_ENCRYPTION_KEY
+```
+
+For the first three commands, paste the matching Meta dashboard value. Generate independent
+random values for the last two. `META_TOKEN_ENCRYPTION_KEY` must decode to exactly 32 bytes. In
+PowerShell 7, these commands generate and set suitable values without writing them to a file:
+
+```powershell
+$metaStateBytes = New-Object byte[] 48
+[System.Security.Cryptography.RandomNumberGenerator]::Fill($metaStateBytes)
+[Convert]::ToBase64String($metaStateBytes) | npx wrangler secret put META_OAUTH_STATE_SECRET
+
+$metaEncryptionBytes = New-Object byte[] 32
+[System.Security.Cryptography.RandomNumberGenerator]::Fill($metaEncryptionBytes)
+[Convert]::ToBase64String($metaEncryptionBytes) | npx wrangler secret put META_TOKEN_ENCRYPTION_KEY
+```
+
+Use different random bytes for the signing and encryption secrets. Rotating the encryption key
+without first reconnecting will make existing ciphertext unreadable to a future publishing phase.
+
+Development/Standard Access is sufficient only for Facebook users assigned an app role. Live
+access for people outside app roles requires Advanced Access/App Review for the requested
+permissions and generally business verification. The next publishing phase will additionally
+need `pages_manage_posts` and `instagram_content_publish`; request their Advanced Access only
+when a real publishing interface exists and can be demonstrated during review.
+
+Current Meta references: [Facebook Login for Business](https://developers.facebook.com/docs/facebook-login/facebook-login-for-business/),
+[manual login flow](https://developers.facebook.com/docs/facebook-login/guides/advanced/manual-flow/),
+[long-lived tokens](https://developers.facebook.com/docs/facebook-login/guides/access-tokens/get-long-lived/),
+[Pages getting started](https://developers.facebook.com/docs/pages-api/getting-started/), and
+[Instagram API with Facebook Login](https://developers.facebook.com/docs/instagram-platform/instagram-api-with-facebook-login/get-started).
 
 ## Google Analytics setup
 

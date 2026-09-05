@@ -19,6 +19,10 @@
     "ALLOWED_ORIGINS": "https://dohnnyj3pp.github.io,https://pacebrosvisuals.ca,https://www.pacebrosvisuals.ca",
     "MAX_UPLOAD_BYTES": "95000000",
     "ANALYTICS_REALTIME_CACHE_SECONDS": "60",
-    "ANALYTICS_HISTORICAL_CACHE_SECONDS": "300"
+    "ANALYTICS_HISTORICAL_CACHE_SECONDS": "300",
+    "META_GRAPH_API_VERSION": "v26.0",
+    "META_REDIRECT_URI": "https://pacebrosvisuals.ca/admin/",
+    "META_REQUIRED_SCOPES": "pages_show_list,pages_read_engagement,business_management",
+    "META_OAUTH_STATE_TTL_SECONDS": "600"
   }
 }

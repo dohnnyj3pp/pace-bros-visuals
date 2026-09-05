@@ -51,6 +51,7 @@
       ),
       filmsView: document.querySelector("#films-view"),
       clipsView: document.querySelector("#clips-view"),
+      socialMediaView: document.querySelector("#social-media-view"),
       analyticsView: document.querySelector("#analytics-view"),
       placeholderView: document.querySelector("#placeholder-view"),
       settingsView: document.querySelector("#settings-view"),
@@ -156,6 +157,12 @@
         workerBaseUrl,
       }) || { ensureLoaded() {} };
 
+    const socialController =
+      global.PaceAdminSocial?.createController({
+        client,
+        workerBaseUrl,
+      }) || { ensureLoaded() {}, hasPendingCallback: () => false };
+
     function getFilm(filmId) {
       return (
         state.films.find(
@@ -207,15 +214,14 @@
     }
 
     function showView(viewName) {
-      const isPlaceholder = [
-        "social-media",
-        "automation",
-      ].includes(viewName);
+      const isPlaceholder = viewName === "automation";
 
       const targetView = isPlaceholder
         ? elements.placeholderView
         : viewName === "clips"
           ? elements.clipsView
+          : viewName === "social-media"
+            ? elements.socialMediaView
           : viewName === "analytics"
             ? elements.analyticsView
             : viewName === "settings"
@@ -251,13 +257,14 @@
         return;
       }
 
+      if (viewName === "social-media") {
+        socialController.ensureLoaded();
+        return;
+      }
+
       if (!isPlaceholder) return;
 
       const placeholders = {
-        "social-media": [
-          "Publishing",
-          "Social Media",
-        ],
         automation: [
           "Publishing",
           "Automation",
@@ -1603,7 +1610,11 @@
       },
     );
 
-    showView("films");
+    showView(
+      socialController.hasPendingCallback()
+        ? "social-media"
+        : "films",
+    );
     loadFilms();
   }
 

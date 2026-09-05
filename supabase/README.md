@@ -25,3 +25,16 @@ deleted while promotional clips still belong to it.
 
 The migration is intentionally not run automatically by this static-site repository. Paste its
 complete contents into the Supabase SQL Editor and run it once before using **Admin → Clips**.
+
+## Social Connections migration
+
+Apply `migrations/202609050002_create_social_connections.sql` once after the earlier migrations.
+It creates generic `public.social_connections` storage for one selected external account per row,
+including an AES-GCM ciphertext envelope, token expiry, scopes, sanitized provider metadata, and
+connection timestamps. The Meta implementation stores a Facebook Page row and keeps the linked
+Instagram Professional identity in its non-secret metadata.
+
+Only authenticated UUIDs present in `public.admin_users` receive access through Row Level
+Security; anonymous roles receive none. Admin browser code does not query this table. The Worker
+uses the current administrator's Supabase token for RLS-protected persistence and returns only a
+sanitized projection. Run the migration once before using **Admin → Social Media**.

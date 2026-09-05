@@ -929,6 +929,188 @@ input[type="file"]::file-selector-button {
   font-size: 0.78rem;
 }
 
+/* Protected social account connections */
+.social-provider-panel,
+.meta-selection-panel {
+  max-width: 68rem;
+}
+
+.meta-selection-panel {
+  margin-bottom: 1rem;
+  border-color: color-mix(in srgb, var(--ember) 58%, var(--border));
+}
+
+.social-provider-heading,
+.social-account-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.social-panel-copy {
+  max-width: 45rem;
+  margin: 1rem 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.social-loading {
+  display: grid;
+  min-height: 9rem;
+  place-items: center;
+  margin-top: 1.25rem;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.social-connect-state {
+  display: grid;
+  max-width: 42rem;
+  justify-items: start;
+  gap: 1.1rem;
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+}
+
+.social-connect-state p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.meta-connected-state {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+}
+
+.social-account-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.social-account-card {
+  min-width: 0;
+  padding: 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  background: var(--panel-raised);
+}
+
+.social-account-heading > p {
+  margin: 0;
+  color: var(--muted);
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.social-account-card h3,
+.meta-page-option h3 {
+  margin: 1.15rem 0 0;
+  font-family: var(--font-display);
+  font-size: 1.55rem;
+  font-weight: 400;
+  letter-spacing: 0.025em;
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+}
+
+.social-account-detail,
+.meta-page-option p {
+  margin: 0.45rem 0 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  overflow-wrap: anywhere;
+}
+
+.social-connection-meta {
+  display: grid;
+  grid-template-columns: 1.4fr 0.8fr 1fr;
+  margin: 1rem 0 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.social-connection-meta > div {
+  min-width: 0;
+  padding: 0.9rem 1rem;
+  border-right: 1px solid var(--border);
+}
+
+.social-connection-meta > div:first-child {
+  padding-left: 0;
+}
+
+.social-connection-meta > div:last-child {
+  padding-right: 0;
+  border-right: 0;
+}
+
+.social-connection-meta dt {
+  color: var(--muted);
+  font-family: var(--font-display);
+  font-size: 0.66rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.social-connection-meta dd {
+  margin: 0.3rem 0 0;
+  font-size: 0.76rem;
+  overflow-wrap: anywhere;
+}
+
+.social-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
+
+.social-disconnect-button {
+  border-color: color-mix(in srgb, var(--ember) 60%, var(--border));
+  color: #d99791;
+}
+
+.status-badge.is-warning {
+  color: var(--warning);
+}
+
+.status-badge.is-warning::before {
+  background: var(--warning);
+}
+
+.meta-page-options {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.meta-page-option {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  background: var(--panel-raised);
+}
+
+.meta-page-option h3 {
+  margin-top: 0;
+}
+
 .form-actions {
   display: flex;
   flex-wrap: wrap;
@@ -1348,6 +1530,38 @@ input[type="file"]::file-selector-button {
 
   .clip-media-metadata > div:last-child {
     border-bottom: 0;
+  }
+
+  .social-account-grid,
+  .social-connection-meta,
+  .meta-page-option {
+    grid-template-columns: 1fr;
+  }
+
+  .social-provider-heading,
+  .social-account-heading {
+    align-items: flex-start;
+  }
+
+  .social-connection-meta > div,
+  .social-connection-meta > div:first-child,
+  .social-connection-meta > div:last-child {
+    padding: 0.8rem 0;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .social-connection-meta > div:last-child {
+    border-bottom: 0;
+  }
+
+  .social-actions,
+  .meta-page-option .button {
+    width: 100%;
+  }
+
+  .social-actions .button {
+    flex: 1 1 100%;
   }
 }
 

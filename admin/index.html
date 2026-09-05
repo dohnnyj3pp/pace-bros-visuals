@@ -13,7 +13,7 @@
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;500&family=Manrope:wght@300;400;500;600&display=swap"
     />
-    <link rel="stylesheet" href="css/admin.css?v=phase3-clips" />
+    <link rel="stylesheet" href="css/admin.css?v=phase3-meta" />
     <script
       src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.4"
       integrity="sha384-yiVMs0R/Jyz7OhoXa/DsEMUSBLjEhr/QJta2ONO+zB6I8/GmNg/7AUFrZmAJV7KV"
@@ -25,7 +25,8 @@
     <script src="../js/auth.js" defer></script>
     <script src="js/analytics.js?v=phase3" defer></script>
     <script src="js/clips.js?v=phase3-clips" defer></script>
-    <script src="js/admin.js?v=phase3-clips" defer></script>
+    <script src="js/social.js?v=phase3-meta" defer></script>
+    <script src="js/admin.js?v=phase3-meta" defer></script>
     <script src="js/admin-guard.js" defer></script>
   </head>
   <body class="admin-page">
@@ -72,7 +73,7 @@
             </div>
             <div class="nav-group">
               <p>Publishing</p>
-              <button class="nav-item" type="button" data-view="social-media">Social Media <span>Coming soon</span></button>
+              <button class="nav-item" type="button" data-view="social-media">Social Media</button>
               <button class="nav-item" type="button" data-view="automation">Automation <span>Coming soon</span></button>
             </div>
             <div class="nav-group">
@@ -296,6 +297,98 @@
                   <button id="save-clip-button" class="button button-publish" type="submit">Save Clip</button>
                 </div>
               </form>
+            </section>
+          </section>
+
+          <section id="social-media-view" class="workspace-view" data-workspace-view="social-media" hidden>
+            <header class="workspace-header">
+              <div>
+                <p class="eyebrow">Publishing</p>
+                <h1>Social Media</h1>
+                <p class="workspace-intro">Connected Accounts</p>
+              </div>
+              <button id="social-refresh" class="button button-secondary" type="button">Refresh</button>
+            </header>
+
+            <p id="social-feedback" class="feedback" role="status" aria-live="polite"></p>
+
+            <section id="meta-page-selection" class="panel meta-selection-panel" aria-labelledby="meta-selection-heading" hidden>
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Meta Authorization</p>
+                  <h2 id="meta-selection-heading">Select Facebook Page</h2>
+                </div>
+                <button id="cancel-meta-selection" class="text-button" type="button">Cancel</button>
+              </div>
+              <p class="social-panel-copy">
+                Choose the Facebook Page Pace Bros should use. A linked Instagram Professional account will be connected with it when available.
+              </p>
+              <div id="meta-page-options" class="meta-page-options"></div>
+            </section>
+
+            <section class="panel social-provider-panel" aria-labelledby="meta-provider-heading">
+              <div class="social-provider-heading">
+                <div>
+                  <p class="eyebrow">Meta</p>
+                  <h2 id="meta-provider-heading">Facebook + Instagram</h2>
+                </div>
+                <span id="meta-provider-status" class="status-badge is-archived">Not connected</span>
+              </div>
+
+              <div id="social-loading" class="social-loading" role="status" aria-live="polite">
+                Open Social Media to load connected accounts.
+              </div>
+
+              <div id="meta-connect-state" class="social-connect-state" hidden>
+                <p>
+                  Connect the Facebook identity that manages Pace Bros Visuals. Pace Bros will discover managed Pages and any linked Instagram Professional account.
+                </p>
+                <button id="connect-meta-button" class="button button-publish" type="button">Connect Meta</button>
+              </div>
+
+              <div id="meta-connected-state" class="meta-connected-state" hidden>
+                <div class="social-account-grid">
+                  <article class="social-account-card" aria-labelledby="meta-facebook-label">
+                    <div class="social-account-heading">
+                      <p id="meta-facebook-label">Facebook</p>
+                      <span id="meta-facebook-status" class="status-badge is-active">Connected</span>
+                    </div>
+                    <h3 id="meta-facebook-name">—</h3>
+                    <p id="meta-facebook-detail" class="social-account-detail"></p>
+                  </article>
+
+                  <article class="social-account-card" aria-labelledby="meta-instagram-label">
+                    <div class="social-account-heading">
+                      <p id="meta-instagram-label">Instagram</p>
+                      <span id="meta-instagram-status" class="status-badge is-archived">Not connected</span>
+                    </div>
+                    <h3 id="meta-instagram-name">No professional account linked</h3>
+                    <p id="meta-instagram-detail" class="social-account-detail">
+                      Link an Instagram Professional account to the selected Facebook Page to discover it here.
+                    </p>
+                  </article>
+                </div>
+
+                <dl class="social-connection-meta">
+                  <div>
+                    <dt>Permissions</dt>
+                    <dd id="meta-permissions">—</dd>
+                  </div>
+                  <div>
+                    <dt>Connected</dt>
+                    <dd id="meta-connected-at">—</dd>
+                  </div>
+                  <div>
+                    <dt>Token status</dt>
+                    <dd id="meta-token-status">—</dd>
+                  </div>
+                </dl>
+
+                <div class="social-actions">
+                  <button id="reconnect-meta-button" class="button button-secondary" type="button">Reconnect</button>
+                  <button id="disconnect-meta-button" class="button button-secondary social-disconnect-button" type="button">Disconnect</button>
+                </div>
+              </div>
             </section>
           </section>
 
